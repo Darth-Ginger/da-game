@@ -14,12 +14,13 @@
 // twice in a row.
 
 export class Haunt {
-  constructor({ world, audio, screens, player, camera }) {
+  constructor({ world, audio, screens, player, camera, vhs }) {
     this.world = world;
     this.audio = audio;
     this.screens = screens;
     this.player = player;
     this.camera = camera;
+    this.vhs = vhs;
     this.time = 0;
     // grace period: let the first few minutes feel merely empty
     this.nextScreen = 20 + Math.random() * 15;
@@ -53,6 +54,7 @@ export class Haunt {
     const ok = Math.random() < 0.55
       ? unit.startTyping(this.audio)
       : unit.startLogs(this.audio);
+    if (ok && this.vhs) this.vhs.kick(0.3 + Math.random() * 0.2);
     // sometimes the text reaches into the building shortly after
     if (ok && Math.random() < 0.45) {
       this.pendingEnv = this.time + 0.8 + Math.random() * 2.2;
@@ -60,6 +62,8 @@ export class Haunt {
   }
 
   envEffect() {
+    // the tape takes it worst when the building itself reacts
+    if (this.vhs) this.vhs.kick(0.6 + Math.random() * 0.4);
     const r = Math.random();
     if (r < 0.3) {
       this.world.triggerSurge();
@@ -75,6 +79,7 @@ export class Haunt {
   }
 
   presenceEvent() {
+    if (this.vhs) this.vhs.kick(0.25 + Math.random() * 0.15);
     const p = this.player.pos;
     // avoid repeating the previous trick
     let r;

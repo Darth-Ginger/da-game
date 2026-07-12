@@ -42,7 +42,7 @@ const audio = new AudioScape();
 const touch = new TouchControls(renderer.domElement);
 player.touch = touch;
 const liveScreens = new LiveScreens(scene, audio);
-const haunt = new Haunt({ world, audio, screens: liveScreens, player, camera });
+const haunt = new Haunt({ world, audio, screens: liveScreens, player, camera, vhs });
 
 player.onFootstep = (running, speedFrac) => audio.footstep(running, speedFrac);
 
@@ -67,6 +67,7 @@ function openTerminal() {
   player.enabled = false;
   interactPrompt.classList.add('hidden');
   if (!touch.active && document.pointerLockElement) document.exitPointerLock();
+  vhs.kick(0.35); // leaning into the CRT upsets the tape a little
   terminal.openFor(interactTarget);
 }
 interactPrompt.addEventListener('click', openTerminal);
@@ -170,4 +171,4 @@ function animate() {
 animate();
 
 // headless / automation hook
-window.__game = { begin, player, world, maze: MZ, terminal, haunt, liveScreens, audio };
+window.__game = { begin, player, world, maze: MZ, terminal, haunt, liveScreens, audio, vhs };

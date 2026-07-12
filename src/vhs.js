@@ -39,22 +39,26 @@ void main() {
   float t = uTime;
 
   // --- tape-transport geometry errors (applied in tape space) ---
-  // per-scanline horizontal jitter
+  // At rest the tape runs almost clean: grain, scanlines and a whisper of
+  // jitter. The tearing lives behind uTrack, which the haunt director kicks
+  // when something happens — the damage IS the event.
   float line = floor(uv.y * uRes.y);
-  uv.x += (hash12(vec2(line, floor(t * 61.0))) - 0.5) * (0.0016 + uTrack * 0.004);
+  uv.x += (hash12(vec2(line, floor(t * 61.0))) - 0.5) * (0.0006 + uTrack * 0.005);
 
   // slow breathing wobble
-  uv.x += sin(t * 0.7 + uv.y * 3.0) * 0.0007;
+  uv.x += sin(t * 0.7 + uv.y * 3.0) * 0.0004;
 
-  // tracking band: a horizontal strip that tears sideways, drifting down
+  // tracking band: a horizontal strip that tears sideways, drifting down.
+  // Nearly invisible at rest, violent during events.
+  float bandAmt = 0.06 + uTrack * 1.6;
   float bandPos = fract(t * 0.13);
-  float band = smoothstep(0.055, 0.0, abs(uv.y - bandPos));
+  float band = smoothstep(0.055, 0.0, abs(uv.y - bandPos)) * bandAmt;
   float bandNoise = hash12(vec2(line, floor(t * 30.0)));
-  uv.x += band * (bandNoise - 0.5) * (0.008 + uTrack * 0.09);
+  uv.x += band * (bandNoise - 0.5) * 0.05;
 
   // strong tracking events also shear the whole field + vertical hop
-  uv.x += uTrack * (hash12(vec2(floor(uv.y * 24.0), floor(t * 18.0))) - 0.5) * 0.03;
-  uv.y += uTrack * (hash12(vec2(floor(t * 9.0), 7.0)) - 0.5) * 0.02;
+  uv.x += uTrack * uTrack * (hash12(vec2(floor(uv.y * 24.0), floor(t * 18.0))) - 0.5) * 0.035;
+  uv.y += uTrack * uTrack * (hash12(vec2(floor(t * 9.0), 7.0)) - 0.5) * 0.022;
 
   // head-switching noise at the very bottom of the frame
   float hs = smoothstep(0.985, 1.0, uv.y);
@@ -92,7 +96,7 @@ void main() {
   col *= vec3(0.97, 1.03, 0.99);
 
   // tracking band brightens and gets noisy
-  col += band * (bandNoise - 0.4) * 0.35;
+  col += band * (bandNoise - 0.4) * 0.4;
   col = mix(col, vec3(hash12(buv * uRes + floor(t * 90.0))), hs * 0.85);
 
   // --- scanlines ---
@@ -102,9 +106,9 @@ void main() {
   // --- grain ---
   col += (hash12(buv * uRes + vec2(fract(t * 13.7) * 91.0)) - 0.5) * 0.085;
 
-  // dropout streaks: rare bright horizontal slivers
+  // dropout streaks: rare bright horizontal slivers, more during events
   float drop = hash12(vec2(line, floor(t * 27.0)));
-  if (drop > 0.9985) {
+  if (drop > 0.9995 - uTrack * 0.003) {
     float streak = step(hash12(vec2(line, 3.0)), fract(buv.x * 2.0 + t));
     col += streak * 0.45;
   }
@@ -168,7 +172,7 @@ export class VHSPass {
     this.quadScene.add(quad);
 
     this.track = 0;
-    this.nextTrackAt = 5 + Math.random() * 8;
+    this.nextTrackAt = 20 + Math.random() * 25;
     this.time = 0;
 
     this.setSize(window.innerWidth, window.innerHeight);
@@ -229,13 +233,22 @@ export class VHSPass {
     this.osdTex.needsUpdate = true;
   }
 
+  /**
+   * Spike the tape damage from outside (0..1). The haunt director fires
+   * this as events land, so the glitch reads as cause-and-effect — and
+   * masks whatever the world just changed underneath it.
+   */
+  kick(strength = 0.7) {
+    this.track = Math.min(1.1, Math.max(this.track, strength));
+  }
+
   render(scene, camera, dt, recording) {
     this.time += dt;
 
-    // occasional tracking-error events, decaying exponentially
+    // the tape's own rare, mild tracking wobble; real damage comes from kick()
     if (this.time > this.nextTrackAt) {
-      this.track = 0.6 + Math.random() * 0.4;
-      this.nextTrackAt = this.time + 6 + Math.random() * 16;
+      this.track = Math.max(this.track, 0.3 + Math.random() * 0.25);
+      this.nextTrackAt = this.time + 25 + Math.random() * 35;
     }
     this.track *= Math.exp(-dt * 2.4);
 
