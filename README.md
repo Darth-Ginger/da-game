@@ -66,6 +66,16 @@ Headphones strongly recommended.
   anything you type, clears the line on Enter, runs nothing, and — left
   alone — occasionally scrolls bursts of maintenance-log nonsense that is
   almost, but not quite, plausible.
+- **The haunt** — the nearest CRTs are live world objects (`src/screens.js`):
+  on an irregular clock they type to themselves (hesitant lowercase
+  questions, sometimes erased again) or scroll log bursts you catch in your
+  peripheral vision, with key clicks localized at that desk. Some of these
+  events reach the building (`src/haunt.js`): server fans spin up and LEDs
+  chatter faster, a fluorescent snaps on, dies, or strobes, the air
+  conditioning cuts out or roars on. Between them, sparse presence events —
+  keyboard chatter one row over, footsteps behind you that approach and
+  stop, a chair creaking under someone's weight, a rack door clanking in
+  the dark. You are alone. For now.
 - **VHS camcorder** — the scene renders into a 480-line target, then a single
   post pass (`src/vhs.js`) adds barrel distortion, chroma bleed, line jitter,
   tracking bands, head-switching noise, scanlines, grain, dropouts and a

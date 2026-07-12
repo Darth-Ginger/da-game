@@ -104,6 +104,9 @@ export class AudioScape {
     const ventGain = ctx.createGain();
     ventGain.gain.value = 0.16;
     vent.connect(ventLP); ventLP.connect(ventGain); ventGain.connect(this.master);
+    this.ventGain = ventGain;
+    this.ventBase = 0.16;
+    this.ventRestoreAt = 0;
     const lfo = ctx.createOscillator();
     lfo.frequency.value = 0.055;
     const lfoDepth = ctx.createGain();
@@ -175,7 +178,11 @@ export class AudioScape {
     clickGain.gain.value = 0.6;
     clickHP.connect(clickGain); clickGain.connect(gain);
 
-    return { panner, gain, clickHP, active: false, nextClick: 0, target: null };
+    return {
+      panner, gain, clickHP, fanGain, fanBP, whineGain,
+      fanBase: fanGain.gain.value, whineBase: whineGain.gain.value, fanFreq: fanBP.frequency.value,
+      active: false, nextClick: 0, target: null
+    };
   }
 
   makeLightEmitter(i) {
@@ -236,22 +243,175 @@ export class AudioScape {
     src.start(now, Math.random() * 1.5, 0.2);
   }
 
-  /** Keyboard clack for terminal typing. */
-  uiClick() {
+  /** A positional emitter parked at a world location, feeding the master bus. */
+  posPanner(x, y, z) {
+    const p = this.makePanner();
+    if (p.positionX) {
+      p.positionX.value = x; p.positionY.value = y; p.positionZ.value = z;
+    } else {
+      p.setPosition(x, y, z);
+    }
+    p.connect(this.master);
+    return p;
+  }
+
+  /** One keyboard clack into an arbitrary destination, optionally scheduled. */
+  clickInto(dest, loud = 0.12, hpFreq = 1800, when = 0) {
     if (!this.started) return;
     const ctx = this.ctx;
-    const now = ctx.currentTime;
+    const t = when || ctx.currentTime;
     const src = ctx.createBufferSource();
     src.buffer = this.clickBuf;
     src.playbackRate.value = 0.9 + Math.random() * 0.5;
     const hp = ctx.createBiquadFilter();
     hp.type = 'highpass';
-    hp.frequency.value = 1800;
+    hp.frequency.value = hpFreq;
     const env = ctx.createGain();
-    env.gain.setValueAtTime(0.12, now);
-    env.gain.exponentialRampToValueAtTime(0.001, now + 0.03);
-    src.connect(hp); hp.connect(env); env.connect(this.master);
+    env.gain.setValueAtTime(loud, t);
+    env.gain.exponentialRampToValueAtTime(0.001, t + 0.03);
+    src.connect(hp); hp.connect(env); env.connect(dest);
+    src.start(t);
+  }
+
+  /** Keyboard clack for terminal typing (non-positional). */
+  uiClick() {
+    this.clickInto(this.master, 0.12);
+  }
+
+  // ------------------------------------------------ presence / haunt fx ----
+
+  /** Someone typing at a keyboard a row over. */
+  keyChatter(x, z, n = 8) {
+    if (!this.started) return;
+    const p = this.posPanner(x, 0.9, z);
+    const now = this.ctx.currentTime;
+    let t = now;
+    for (let i = 0; i < n; i++) {
+      t += 0.09 + Math.random() * 0.22;
+      this.clickInto(p, 0.15 + Math.random() * 0.1, 1800, t);
+    }
+    setTimeout(() => p.disconnect(), (t - now + 0.5) * 1000);
+  }
+
+  /** Footsteps behind the player that approach a little, then stop. */
+  footstepsBehind(playerPos, camera) {
+    if (!this.started) return;
+    const ctx = this.ctx;
+    const fwd = camera.getWorldDirection(_tmpVec);
+    const jitter = (Math.random() - 0.5) * 2.5;
+    const sx = playerPos.x - fwd.x * 7 + fwd.z * jitter;
+    const sz = playerPos.z - fwd.z * 7 - fwd.x * jitter;
+    const ex = playerPos.x - fwd.x * 3;
+    const ez = playerPos.z - fwd.z * 3;
+    const p = this.posPanner(sx, 0.2, sz);
+    p.connect(this.reverb);
+    const n = 4 + Math.floor(Math.random() * 3);
+    let t = ctx.currentTime + 0.1;
+    for (let i = 0; i < n; i++) {
+      const f = i / (n - 1);
+      if (p.positionX) {
+        p.positionX.setValueAtTime(sx + (ex - sx) * f, t);
+        p.positionZ.setValueAtTime(sz + (ez - sz) * f, t);
+      }
+      this.thud(p, t, 0.28 + Math.random() * 0.1, 300 + Math.random() * 200);
+      t += 0.38 + Math.random() * 0.14;
+    }
+    setTimeout(() => p.disconnect(), (t - ctx.currentTime + 1) * 1000);
+  }
+
+  /** An office chair shifting under someone's weight. */
+  chairCreak(x, z) {
+    if (!this.started) return;
+    const ctx = this.ctx;
+    const now = ctx.currentTime;
+    const p = this.posPanner(x, 0.5, z);
+    p.connect(this.reverb);
+    const src = ctx.createBufferSource();
+    src.buffer = this.noiseBuf;
+    src.playbackRate.value = 0.22;
+    const bp = ctx.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.Q.value = 14;
+    bp.frequency.setValueAtTime(340, now);
+    bp.frequency.exponentialRampToValueAtTime(170, now + 1.1);
+    const env = ctx.createGain();
+    env.gain.setValueAtTime(0.0001, now);
+    env.gain.exponentialRampToValueAtTime(0.4, now + 0.25);
+    env.gain.exponentialRampToValueAtTime(0.0001, now + 1.3);
+    src.connect(bp); bp.connect(env); env.connect(p);
+    src.start(now, Math.random());
+    src.stop(now + 1.5);
+    setTimeout(() => p.disconnect(), 2500);
+  }
+
+  /** A far-off metallic impact — a rack door, or something like one. */
+  metalClank(x, z) {
+    if (!this.started) return;
+    const ctx = this.ctx;
+    const now = ctx.currentTime;
+    const p = this.posPanner(x, 1.5, z);
+    p.connect(this.reverb);
+    const src = ctx.createBufferSource();
+    src.buffer = this.clickBuf;
+    src.playbackRate.value = 0.4;
+    const bp = ctx.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.frequency.value = 900 + Math.random() * 700;
+    bp.Q.value = 9;
+    const env = ctx.createGain();
+    env.gain.setValueAtTime(0.9, now);
+    env.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+    src.connect(bp); bp.connect(env); env.connect(p);
     src.start(now);
+    const o = ctx.createOscillator();
+    o.frequency.value = 140 + Math.random() * 80;
+    const og = ctx.createGain();
+    og.gain.setValueAtTime(0.15, now);
+    og.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+    o.connect(og); og.connect(p);
+    o.start(now); o.stop(now + 0.55);
+    setTimeout(() => p.disconnect(), 2000);
+  }
+
+  // ------------------------------------------- environmental reactions ----
+
+  /** All nearby server fans spin up for a while, then settle. */
+  serverSurge(seconds = 10) {
+    if (!this.started) return;
+    const ctx = this.ctx;
+    const now = ctx.currentTime;
+    for (const em of this.rackEmitters) {
+      em.fanGain.gain.setTargetAtTime(em.fanBase * 2.1, now, 1.4);
+      em.fanBP.frequency.setTargetAtTime(em.fanFreq * 1.45, now, 1.4);
+      em.whineGain.gain.setTargetAtTime(em.whineBase * 2.6, now, 1.4);
+      em.fanGain.gain.setTargetAtTime(em.fanBase, now + seconds, 2.5);
+      em.fanBP.frequency.setTargetAtTime(em.fanFreq, now + seconds, 2.5);
+      em.whineGain.gain.setTargetAtTime(em.whineBase, now + seconds, 2.5);
+    }
+  }
+
+  /** The air conditioning cuts out (level ~0) or roars up (level > base). */
+  ventSet(level, seconds = 12) {
+    if (!this.started) return;
+    const now = this.ctx.currentTime;
+    this.ventGain.gain.setTargetAtTime(level, now, 0.9);
+    this.ventGain.gain.setTargetAtTime(this.ventBase, now + seconds, 2.0);
+  }
+
+  /** Low-level thud used for both player and ghost footsteps. */
+  thud(dest, when, loud, lpFreq) {
+    const ctx = this.ctx;
+    const src = ctx.createBufferSource();
+    src.buffer = this.noiseBuf;
+    src.playbackRate.value = 0.5 + Math.random() * 0.3;
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = lpFreq;
+    const env = ctx.createGain();
+    env.gain.setValueAtTime(loud, when);
+    env.gain.exponentialRampToValueAtTime(0.001, when + 0.09 + Math.random() * 0.05);
+    src.connect(lp); lp.connect(env); env.connect(dest);
+    src.start(when, Math.random() * 1.5, 0.2);
   }
 
   /** CRT engage/disengage blip for opening or closing the terminal. */

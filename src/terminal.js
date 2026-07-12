@@ -28,7 +28,7 @@ const CREEPY = [
   'ping sublevel2: 10,000 packets transmitted, 0 received. sublevel2 is above you. nothing is above you.'
 ];
 
-function rng(seed) {
+export function rng(seed) {
   let s = seed >>> 0 || 1;
   return () => {
     s = (Math.imul(s, 1664525) + 1013904223) >>> 0;
@@ -42,7 +42,7 @@ function hex(rand, n) {
   return out;
 }
 
-function junkLine(rand) {
+export function junkLine(rand) {
   const r = rand();
   if (r < 0.02) return CREEPY[Math.floor(rand() * CREEPY.length)];
   if (r < 0.22) {

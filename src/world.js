@@ -20,7 +20,7 @@ const { CELL, WALL_H, WALL_T } = MZ;
 
 function ledMaterial() {
   return new THREE.ShaderMaterial({
-    uniforms: THREE.UniformsUtils.merge([THREE.UniformsLib.fog, { uTime: { value: 0 } }]),
+    uniforms: THREE.UniformsUtils.merge([THREE.UniformsLib.fog, { uTime: { value: 0 }, uSurge: { value: 0 } }]),
     vertexShader: /* glsl */`
       #include <common>
       #include <fog_pars_vertex>
@@ -39,15 +39,17 @@ function ledMaterial() {
       #include <common>
       #include <fog_pars_fragment>
       uniform float uTime;
+      uniform float uSurge;
       varying vec3 vColor;
       varying vec2 vBlink;
       void main() {
         float on = 1.0;
         if (vBlink.x > 0.0) {
-          float t = uTime * vBlink.x + vBlink.y;
+          // activity surges make every blinking LED chatter faster
+          float t = uTime * vBlink.x * (1.0 + uSurge * 2.5) + vBlink.y;
           on = step(0.4, fract(sin(floor(t) * 91.17) * 43758.5453));
         }
-        vec3 col = vColor * (0.12 + 1.25 * on);
+        vec3 col = vColor * (0.12 + (1.25 + 0.35 * uSurge) * on);
         gl_FragColor = vec4(col, 1.0);
         #include <fog_fragment>
       }`,
@@ -189,6 +191,7 @@ export class World {
     this.time = 0;
     this.lightTimer = 0;
     this.firstLoad = true;
+    this.surge = 0; // LED activity surge, decays on its own
 
     this.lights = [];
     for (let i = 0; i < LIGHT_POOL; i++) {
@@ -205,6 +208,8 @@ export class World {
   update(playerPos, dt) {
     this.time += dt;
     this.ledMat.uniforms.uTime.value = this.time;
+    this.surge *= Math.exp(-dt / 5);
+    this.ledMat.uniforms.uSurge.value = this.surge;
 
     const pcx = Math.floor(playerPos.x / CHUNK_M);
     const pcy = Math.floor(playerPos.z / CHUNK_M);
@@ -248,8 +253,21 @@ export class World {
       if (Math.abs(chunk.cy * CHUNK_M + CHUNK_M / 2 - playerPos.z) > CHUNK_M * 2.5) continue;
       let dirty = false;
       for (const f of chunk.fixtures) {
-        if (f.state === MZ.FIX.ON) continue;
-        const v = flickerIntensity(this.time, f.seed, f.state === MZ.FIX.DYING);
+        let v;
+        if (f.override) {
+          if (this.time >= f.override.until) {
+            f.override = null;
+          } else {
+            const m = f.override.mode;
+            v = m === 'off' ? 0.02
+              : m === 'on' ? 1
+              : flickerIntensity(this.time * 4, f.seed + 7, true); // strobe
+          }
+        }
+        if (v === undefined) {
+          if (f.state === MZ.FIX.ON) v = 1;
+          else v = flickerIntensity(this.time, f.seed, f.state === MZ.FIX.DYING);
+        }
         if (v !== f.intensity) {
           f.intensity = v;
           chunk.tubeGlow.setX(f.index, v);
@@ -306,6 +324,53 @@ export class World {
     racks.sort((a, b) => a.d2 - b.d2);
     lights.sort((a, b) => a.d2 - b.d2);
     return { racks: racks.slice(0, 4), lights: lights.slice(0, 3).map(l => l.f) };
+  }
+
+  /** All workstations within radius r of a point, nearest first. */
+  workstationsNear(pos, r) {
+    const out = [];
+    const r2 = r * r;
+    const ccx = Math.floor(pos.x / CHUNK_M), ccy = Math.floor(pos.z / CHUNK_M);
+    for (let gy = ccy - 1; gy <= ccy + 1; gy++) {
+      for (let gx = ccx - 1; gx <= ccx + 1; gx++) {
+        const chunk = this.chunks.get(this.key(gx, gy));
+        if (!chunk) continue;
+        for (const ws of chunk.workstations) {
+          const dx = ws.x - pos.x, dz = ws.z - pos.z;
+          const d2 = dx * dx + dz * dz;
+          if (d2 < r2) { ws.d2 = d2; out.push(ws); }
+        }
+      }
+    }
+    out.sort((a, b) => a.d2 - b.d2);
+    return out;
+  }
+
+  /**
+   * Poltergeist a nearby fluorescent: lit fixtures die or strobe, dark ones
+   * snap on. Returns the fixture's position (for sound coupling) or null.
+   */
+  lightEvent(playerPos) {
+    const near = [];
+    for (const chunk of this.chunks.values()) {
+      for (const f of chunk.fixtures) {
+        const dx = f.x - playerPos.x, dz = f.z - playerPos.z;
+        const d2 = dx * dx + dz * dz;
+        if (d2 < 18 * 18 && !f.override) near.push(f);
+      }
+    }
+    if (!near.length) return null;
+    const f = near[Math.floor(Math.random() * near.length)];
+    const lit = f.state === MZ.FIX.ON || f.state === MZ.FIX.FLICKER;
+    const r = Math.random();
+    const mode = r < 0.3 ? 'strobe' : lit ? 'off' : 'on';
+    f.override = { mode, until: this.time + 6 + Math.random() * 12 };
+    return { x: f.x, z: f.z, mode };
+  }
+
+  /** Kick the global LED activity surge (decays over ~5 s). */
+  triggerSurge() {
+    this.surge = 1;
   }
 
   /**

@@ -5,6 +5,8 @@ import { VHSPass } from './vhs.js';
 import { AudioScape } from './audio.js';
 import { TouchControls } from './touch.js';
 import { Terminal } from './terminal.js';
+import { LiveScreens } from './screens.js';
+import { Haunt } from './haunt.js';
 import * as MZ from './maze.js';
 
 const app = document.getElementById('app');
@@ -38,6 +40,8 @@ const vhs = new VHSPass(renderer);
 const audio = new AudioScape();
 const touch = new TouchControls(renderer.domElement);
 player.touch = touch;
+const liveScreens = new LiveScreens(scene, audio);
+const haunt = new Haunt({ world, audio, screens: liveScreens, player, camera });
 
 player.onFootstep = (running, speedFrac) => audio.footstep(running, speedFrac);
 
@@ -144,6 +148,10 @@ function animate() {
   world.update(player.pos, dt);
   audio.update(dt, camera, world, player.pos);
   terminal.update(dt);
+  if (started) {
+    liveScreens.update(dt, world, player.pos);
+    haunt.update(dt);
+  }
 
   if (started && !terminal.open) {
     interactTarget = world.interactableAt(camera.position, camera.getWorldDirection(_fwd));
@@ -161,4 +169,4 @@ function animate() {
 animate();
 
 // headless / automation hook
-window.__game = { begin, player, world, maze: MZ, terminal };
+window.__game = { begin, player, world, maze: MZ, terminal, haunt, liveScreens, audio };
