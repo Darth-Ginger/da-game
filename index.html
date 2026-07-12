@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
   <title>SUBLEVEL 3</title>
   <style>
     html, body {
@@ -13,6 +13,9 @@
       background: #000;
       overflow: hidden;
       cursor: default;
+      touch-action: none;
+      -webkit-user-select: none;
+      user-select: none;
     }
     canvas { display: block; }
     #app { position: fixed; inset: 0; }
@@ -66,6 +69,47 @@
     }
     @keyframes blink { 50% { opacity: 0; } }
 
+    /* ---- touch controls (shown only on touch devices, in-game) ---- */
+    #touchUI { display: none; }
+    body.touch-playing #touchUI { display: block; }
+    #joyBase {
+      display: none;
+      position: fixed;
+      width: 128px;
+      height: 128px;
+      margin: -64px 0 0 -64px;
+      border: 2px solid rgba(200, 230, 205, 0.35);
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 5;
+    }
+    #joyKnob {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 52px;
+      height: 52px;
+      transform: translate(-50%, -50%);
+      border: 2px solid rgba(200, 230, 205, 0.55);
+      background: rgba(200, 230, 205, 0.12);
+      border-radius: 50%;
+    }
+    #btnLight {
+      position: fixed;
+      right: max(18px, env(safe-area-inset-right));
+      bottom: max(22px, env(safe-area-inset-bottom));
+      padding: 14px 18px;
+      font-family: "Courier New", Courier, monospace;
+      font-size: 13px;
+      letter-spacing: 0.22em;
+      color: #cfe3cf;
+      background: rgba(0, 0, 0, 0.35);
+      border: 2px solid rgba(200, 230, 205, 0.4);
+      border-radius: 6px;
+      text-shadow: 0 0 6px rgba(180, 255, 200, 0.55);
+      z-index: 5;
+    }
+
     #startScreen::after, #pauseScreen::after {
       content: "";
       position: absolute;
@@ -87,8 +131,8 @@
   <div id="startScreen" class="screen">
     <h1>SUBLEVEL&nbsp;3</h1>
     <div class="sub">FACILITY CAMERA &mdash; TAPE 07</div>
-    <div class="play">&#9654; CLICK TO INSERT TAPE</div>
-    <div class="controls">
+    <div class="play" id="playPrompt">&#9654; CLICK TO INSERT TAPE</div>
+    <div class="controls" id="controlsHint">
       W A S D &mdash; MOVE&emsp;&emsp;MOUSE &mdash; LOOK<br />
       SHIFT &mdash; RUN&emsp;&emsp;F &mdash; CAMERA LIGHT&emsp;&emsp;ESC &mdash; PAUSE<br />
       HEADPHONES RECOMMENDED
@@ -99,6 +143,11 @@
   <div id="pauseScreen" class="screen hidden">
     <h1>&#10074;&#10074; PAUSE</h1>
     <div class="play">&#9654; CLICK TO RESUME</div>
+  </div>
+
+  <div id="touchUI">
+    <div id="joyBase"><div id="joyKnob"></div></div>
+    <button id="btnLight">&#9788; LIGHT</button>
   </div>
 
   <script type="module" src="/src/main.js"></script>

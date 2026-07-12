@@ -12,15 +12,21 @@ There are no objectives, no combat, and no exits. Only aisles.
 
 ## Play
 
+**In a browser:** the game auto-deploys to GitHub Pages on every push —
+<https://darth-ginger.github.io/da-game/> (one-time setup: repo *Settings →
+Pages → Source: “GitHub Actions”*). Works on desktop and phones.
+
+**Locally:**
+
 ```bash
 npm install
 npm run dev      # open the printed URL
 npm run build    # static build in dist/
 ```
 
-Desktop browser with a keyboard required. Headphones strongly recommended.
+Headphones strongly recommended.
 
-| Input | Action |
+| Desktop | Action |
 | --- | --- |
 | Click | Insert tape / resume |
 | `W A S D` / arrows | Move |
@@ -28,6 +34,14 @@ Desktop browser with a keyboard required. Headphones strongly recommended.
 | `Shift` | Run |
 | `F` | Toggle camcorder light |
 | `Esc` | Pause |
+
+| Touch (phone / tablet) | Action |
+| --- | --- |
+| Tap | Insert tape |
+| Left thumb | Analog joystick — move (appears where you touch) |
+| Push stick to the rim | Run |
+| Right thumb drag | Look |
+| `☼ LIGHT` button | Toggle camcorder light |
 
 ## How it works
 

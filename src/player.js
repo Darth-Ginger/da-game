@@ -23,6 +23,7 @@ export class Player {
     this.lastStepIndex = 0;
     this.onFootstep = null; // (running: bool) => void
     this.enabled = false;
+    this.touch = null; // optional TouchControls
 
     camera.rotation.order = 'YXZ';
 
@@ -47,21 +48,34 @@ export class Player {
 
   update(dt, world) {
     let fwd = 0, strafe = 0;
+    let running = this.running;
     if (this.enabled) {
       if (this.keys.has('KeyW') || this.keys.has('ArrowUp')) fwd += 1;
       if (this.keys.has('KeyS') || this.keys.has('ArrowDown')) fwd -= 1;
       if (this.keys.has('KeyA') || this.keys.has('ArrowLeft')) strafe -= 1;
       if (this.keys.has('KeyD') || this.keys.has('ArrowRight')) strafe += 1;
+
+      if (this.touch && this.touch.active) {
+        const look = this.touch.consumeLook();
+        this.yaw -= look.dx * 0.006;
+        this.pitch -= look.dy * 0.006;
+        this.pitch = Math.max(-1.45, Math.min(1.45, this.pitch));
+        strafe += this.touch.move.x;
+        fwd += this.touch.move.y;
+        if (this.touch.magnitude > 0.92) running = true; // stick pushed to the rim
+      }
     }
 
     const target = new THREE.Vector3();
-    if (fwd || strafe) {
+    const len = Math.hypot(fwd, strafe);
+    if (len > 0.02) {
+      const mag = Math.min(1, len); // analog: partial stick = slower walk
       const sin = Math.sin(this.yaw), cos = Math.cos(this.yaw);
       // camera forward on the ground plane
       const fx = -sin, fz = -cos;
       const rx = cos, rz = -sin;
       target.set(fx * fwd + rx * strafe, 0, fz * fwd + rz * strafe);
-      target.normalize().multiplyScalar(this.running ? RUN : WALK);
+      target.normalize().multiplyScalar((running ? RUN : WALK) * mag);
     }
     // exponential approach: snappy but not instant
     this.vel.x += (target.x - this.vel.x) * Math.min(1, dt * 10);
@@ -81,7 +95,7 @@ export class Player {
       const stepIndex = Math.floor(this.bobPhase / Math.PI);
       if (stepIndex !== this.lastStepIndex) {
         this.lastStepIndex = stepIndex;
-        if (this.onFootstep) this.onFootstep(this.running, speedFrac);
+        if (this.onFootstep) this.onFootstep(running, speedFrac);
       }
     }
     this.bob += ((speed > 0.4 ? Math.sin(this.bobPhase) * 0.038 * (0.5 + speedFrac) : 0) - this.bob) * Math.min(1, dt * 12);

@@ -3,6 +3,7 @@ import { World } from './world.js';
 import { Player } from './player.js';
 import { VHSPass } from './vhs.js';
 import { AudioScape } from './audio.js';
+import { TouchControls } from './touch.js';
 import * as MZ from './maze.js';
 
 const app = document.getElementById('app');
@@ -34,8 +35,24 @@ const world = new World(scene);
 const player = new Player(camera, renderer.domElement);
 const vhs = new VHSPass(renderer);
 const audio = new AudioScape();
+const touch = new TouchControls(renderer.domElement);
+player.touch = touch;
 
 player.onFootstep = (running, speedFrac) => audio.footstep(running, speedFrac);
+
+function toggleLight() {
+  camLightOn = !camLightOn;
+  audio.footstep(false, 0.2); // little mechanical clunk
+}
+touch.onLight = toggleLight;
+
+if (touch.active) {
+  document.getElementById('playPrompt').innerHTML = '&#9654; TAP TO INSERT TAPE';
+  document.getElementById('controlsHint').innerHTML =
+    'LEFT THUMB &mdash; MOVE&emsp;&emsp;RIGHT THUMB &mdash; LOOK<br />' +
+    'PUSH STICK TO THE RIM &mdash; RUN&emsp;&emsp;&#9788; &mdash; CAMERA LIGHT<br />' +
+    'HEADPHONES RECOMMENDED';
+}
 
 let started = false;
 
@@ -51,13 +68,23 @@ function begin() {
   started = true;
   player.enabled = true;
   audio.start();
-  lockPointer();
+  if (touch.active) {
+    document.body.classList.add('touch-playing');
+    // best effort: immersive landscape on phones (unsupported APIs just no-op)
+    const fs = document.documentElement.requestFullscreen?.({ navigationUI: 'hide' });
+    if (fs && fs.catch) fs.catch(() => {});
+    const ol = screen.orientation?.lock?.('landscape');
+    if (ol && ol.catch) ol.catch(() => {});
+  } else {
+    lockPointer();
+  }
 }
 
 startScreen.addEventListener('click', begin);
 pauseScreen.addEventListener('click', begin);
 
 document.addEventListener('pointerlockchange', () => {
+  if (touch.active) return; // no pointer lock in the touch flow
   const locked = document.pointerLockElement === renderer.domElement;
   if (!locked && started) {
     player.enabled = false;
@@ -69,10 +96,7 @@ document.addEventListener('pointerlockchange', () => {
 });
 
 document.addEventListener('keydown', e => {
-  if (e.code === 'KeyF' && started) {
-    camLightOn = !camLightOn;
-    audio.footstep(false, 0.2); // little mechanical clunk
-  }
+  if (e.code === 'KeyF' && started) toggleLight();
 });
 
 window.addEventListener('resize', () => {
