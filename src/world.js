@@ -147,6 +147,23 @@ function buildGeometries() {
     boxAt(0.19, 0.48, 0.44, 0.42, 0.24, 0.05)  // tower under the desk
   ]);
   geos.screen = new THREE.PlaneGeometry(0.3, 0.24);
+
+  // UPS battery cabinet: wide, heavy, vented top
+  geos.battery = mergeGeometries([
+    boxAt(1.7, 1.3, 0.75, 0, 0.65, 0),
+    boxAt(1.5, 0.09, 0.6, 0, 1.35, 0),
+    boxAt(1.74, 0.1, 0.79, 0, 0.05, 0)
+  ]);
+
+  // NOC status wall screen
+  geos.wallScreen = new THREE.PlaneGeometry(1.5, 0.85);
+
+  // disturbed raised floor: the dark opening, and the tile set down askew
+  geos.hole = new THREE.PlaneGeometry(0.92, 0.92);
+  geos.hole.rotateX(-Math.PI / 2);
+  geos.holeGlow = new THREE.PlaneGeometry(0.6, 0.6);
+  geos.holeGlow.rotateX(-Math.PI / 2);
+  geos.tile = new THREE.BoxGeometry(0.95, 0.04, 0.95);
   geos.paper = new THREE.PlaneGeometry(0.21, 0.3);
   geos.paper.rotateX(-Math.PI / 2);
   geos.pillar = new THREE.BoxGeometry(0.5, WALL_H, 0.5);
@@ -438,9 +455,12 @@ export class World {
   buildChunk(cx, cy) {
     const group = new THREE.Group();
     const walls = [], racks = [], housings = [], tubes = [], desks = [], chairs = [],
-      cabinets = [], papers = [], pillars = [], trays = [], cables = [], wsMats = [];
+      cabinets = [], papers = [], pillars = [], trays = [], cables = [], wsMats = [],
+      batteries = [], holes = [], tiles = [];
     const leds = { mats: [], colors: [], blinks: [] };
     const screens = { mats: [], colors: [], blinks: [] };
+    const glows = { mats: [], colors: [], blinks: [] };     // under-floor red
+    const wallScr = { mats: [], colors: [], blinks: [] };   // NOC status walls
     const tubeGlows = [];
     const fixtures = [];
     const rackPoints = [];
@@ -481,6 +501,64 @@ export class World {
             this.placeRackRow(x, y, s.side, s.count, racks, leds, colliders);
           }
           rackPoints.push({ x: wx, y: 1.2, z: wz, seed: MZ.hash(x, y, 33) });
+        }
+
+        // battery-room UPS cabinet rows
+        const bsides = isSpawn ? null : MZ.batterySides(x, y);
+        if (bsides) {
+          for (const side of bsides) {
+            this.placeBatteryRow(x, y, side, batteries, leds, colliders);
+          }
+          rackPoints.push({ x: wx, y: 0.9, z: wz, seed: MZ.hash(x, y, 35), type: 'battery' });
+        }
+
+        // NOC status screens on walls
+        const wsc = MZ.wallScreenAt(x, y);
+        if (wsc) {
+          const inset = WALL_T / 2 + 0.03;
+          let sx = wx, sz = wz, ry = 0;
+          if (wsc === 'N') { sz = y * CELL + inset; ry = 0; }
+          else if (wsc === 'S') { sz = (y + 1) * CELL - inset; ry = Math.PI; }
+          else if (wsc === 'W') { sx = x * CELL + inset; ry = Math.PI / 2; }
+          else { sx = (x + 1) * CELL - inset; ry = -Math.PI / 2; }
+          wallScr.mats.push(composed(sx, 1.8, sz, ry));
+          const warm = MZ.hash(x, y, 36) < 0.3;
+          wallScr.colors.push(...(warm ? [0.5, 0.28, 0.05] : [0.07, 0.3, 0.38]));
+          const fl = MZ.hash(x, y, 37);
+          wallScr.blinks.push(fl < 0.35 ? 0.4 + fl : 0, fl * 8);
+        }
+
+        // disturbed raised floor
+        const dist = isSpawn ? null : MZ.floorDisturbAt(x, y);
+        if (dist) {
+          const hx = wx + dist.ox, hz = wz + dist.oz;
+          holes.push(composed(hx, 0.015, hz, dist.ry));
+          // the lifted tile, set down askew beside the opening
+          const ta = MZ.hash(x, y, 57) * Math.PI * 2;
+          tiles.push(composed(
+            hx + Math.cos(ta) * 1.05, 0.045, hz + Math.sin(ta) * 1.05,
+            dist.ry + (MZ.hash(x, y, 58) - 0.5) * 1.2
+          ));
+          if (dist.glow) {
+            glows.mats.push(composed(hx, 0.03, hz, 0));
+            glows.colors.push(0.55, 0.05, 0.02);
+            const gf = MZ.hash(x, y, 59);
+            glows.blinks.push(gf < 0.5 ? 0.3 + gf : 0, gf * 6);
+          }
+          if (dist.cables) {
+            // cables snaking up out of the sub-floor
+            for (let i = 0; i < 2; i++) {
+              const m = new THREE.Matrix4();
+              const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(
+                0.5 + MZ.hash(x, y + i, 51) * 0.8, MZ.hash(x, y + i, 52) * Math.PI * 2, 0));
+              m.compose(
+                new THREE.Vector3(hx + (MZ.hash(x, y + i, 53) - 0.5) * 0.5, 0.18, hz + (MZ.hash(x, y + i, 54) - 0.5) * 0.5),
+                q,
+                new THREE.Vector3(1, 0.55, 1)
+              );
+              cables.push(m);
+            }
+          }
         }
 
         // computer workstations (interactable terminals)
@@ -571,6 +649,9 @@ export class World {
     addInst(g.cable, m.cable, cables);
     addInst(g.wsDesk, m.furniture, wsMats);
     addInst(g.wsHardware, m.plastic, wsMats);
+    addInst(g.battery, m.metalDark, batteries);
+    addInst(g.hole, m.hole, holes);
+    addInst(g.tile, m.ceiling, tiles);
 
     // fluorescent tubes carry a per-instance glow attribute
     let tubeGlow = null;
@@ -590,13 +671,17 @@ export class World {
       addInst(ledGeo, this.ledMat, leds.mats, true);
     }
 
-    // CRT screens: same emissive shader, dim phosphor-green glow
-    if (screens.mats.length) {
-      const scrGeo = g.screen.clone();
-      scrGeo.setAttribute('aColor', new THREE.InstancedBufferAttribute(new Float32Array(screens.colors), 3));
-      scrGeo.setAttribute('aBlink', new THREE.InstancedBufferAttribute(new Float32Array(screens.blinks), 2));
-      addInst(scrGeo, this.ledMat, screens.mats, true);
-    }
+    // emissive quads sharing the LED shader: CRTs, wall screens, floor glow
+    const addEmissive = (baseGeo, set) => {
+      if (!set.mats.length) return;
+      const geo = baseGeo.clone();
+      geo.setAttribute('aColor', new THREE.InstancedBufferAttribute(new Float32Array(set.colors), 3));
+      geo.setAttribute('aBlink', new THREE.InstancedBufferAttribute(new Float32Array(set.blinks), 2));
+      addInst(geo, this.ledMat, set.mats, true);
+    };
+    addEmissive(g.screen, screens);
+    addEmissive(g.wallScreen, wallScr);
+    addEmissive(g.holeGlow, glows);
 
     // floor + ceiling slabs
     const cxm = cx * CHUNK_M + CHUNK_M / 2, cym = cy * CHUNK_M + CHUNK_M / 2;
@@ -612,22 +697,29 @@ export class World {
 
   placeWorkstation(x, y, ws, wsMats, screens, workstations, colliders) {
     const wx = (x + 0.5) * CELL, wz = (y + 0.5) * CELL;
-    // shove the desk against a wall when there is one; screen faces the room
-    const has = { N: MZ.wallN(x, y), S: MZ.wallS(x, y), E: MZ.wallE(x, y), W: MZ.wallW(x, y) };
-    const order = ['N', 'E', 'S', 'W'];
-    const start = Math.floor(MZ.hash(x, y, 25) * 4);
-    let side = null;
-    for (let i = 0; i < 4; i++) {
-      const s = order[(start + i) % 4];
-      if (has[s]) { side = s; break; }
-    }
-    const BACK = WALL_T / 2 + 0.45;
     let px = wx, pz = wz, ry;
-    if (side === 'N') { pz = y * CELL + BACK; ry = 0; }              // faces +z
-    else if (side === 'S') { pz = (y + 1) * CELL - BACK; ry = Math.PI; }
-    else if (side === 'W') { px = x * CELL + BACK; ry = Math.PI / 2; } // faces +x
-    else if (side === 'E') { px = (x + 1) * CELL - BACK; ry = -Math.PI / 2; }
-    else { ry = Math.floor(MZ.hash(x, y, 26) * 4) * Math.PI / 2; }     // free-standing
+    if (MZ.zoneAt(x, y) === MZ.ZONES.NOC) {
+      // console rows: every desk in the operations room faces the same way
+      ry = MZ.nocFacing(x, y);
+      px += (MZ.hash(x, y, 25) - 0.5) * 0.7;
+      pz += (MZ.hash(x, y, 26) - 0.5) * 0.7;
+    } else {
+      // shove the desk against a wall when there is one; screen faces the room
+      const has = { N: MZ.wallN(x, y), S: MZ.wallS(x, y), E: MZ.wallE(x, y), W: MZ.wallW(x, y) };
+      const order = ['N', 'E', 'S', 'W'];
+      const start = Math.floor(MZ.hash(x, y, 25) * 4);
+      let side = null;
+      for (let i = 0; i < 4; i++) {
+        const s = order[(start + i) % 4];
+        if (has[s]) { side = s; break; }
+      }
+      const BACK = WALL_T / 2 + 0.45;
+      if (side === 'N') { pz = y * CELL + BACK; ry = 0; }              // faces +z
+      else if (side === 'S') { pz = (y + 1) * CELL - BACK; ry = Math.PI; }
+      else if (side === 'W') { px = x * CELL + BACK; ry = Math.PI / 2; } // faces +x
+      else if (side === 'E') { px = (x + 1) * CELL - BACK; ry = -Math.PI / 2; }
+      else { ry = Math.floor(MZ.hash(x, y, 26) * 4) * Math.PI / 2; }     // free-standing
+    }
 
     wsMats.push(composed(px, 0, pz, ry));
 
@@ -642,6 +734,41 @@ export class World {
 
     workstations.push({ x: px, z: pz, fx: sin, fz: cos, seed: ws.seed });
     colliders.push([px - 0.72, pz - 0.72, px + 0.72, pz + 0.72]);
+  }
+
+  placeBatteryRow(x, y, side, batteries, leds, colliders) {
+    const D = 0.75, GAP = WALL_T / 2 + D / 2 + 0.05;
+    const wx = (x + 0.5) * CELL, wz = (y + 0.5) * CELL;
+    let px = wx, pz = wz, ry = 0, tx = 0, tz = 0;
+    if (side === 'E') { px = (x + 1) * CELL - GAP; ry = -Math.PI / 2; tz = 1; }
+    if (side === 'W') { px = x * CELL + GAP; ry = Math.PI / 2; tz = 1; }
+    if (side === 'S') { pz = (y + 1) * CELL - GAP; ry = Math.PI; tx = 1; }
+    if (side === 'N') { pz = y * CELL + GAP; ry = 0; tx = 1; }
+
+    for (let i = -1; i <= 1; i += 2) {
+      const off = i * 0.93;
+      const bx = px + tx * off, bz = pz + tz * off;
+      batteries.push(composed(bx, 0, bz, ry));
+
+      // one or two charge-status LEDs, amber or red, low on the cabinet
+      const sin = Math.sin(ry), cos = Math.cos(ry);
+      const n = 1 + Math.floor(MZ.hash(x * 5 + i, y, 38) * 2);
+      for (let j = 0; j < n; j++) {
+        const lx = (MZ.hash(x, y * 7 + j, 39 + i) - 0.5) * 1.1;
+        const lz = D / 2 + 0.015;
+        leds.mats.push(composed(bx + lx * cos + lz * sin, 0.9 + j * 0.12, bz - lx * sin + lz * cos, ry));
+        const red = MZ.hash(x * 3 + j, y - i, 40) < 0.3;
+        leds.colors.push(...(red ? [1.0, 0.1, 0.05] : [1.0, 0.55, 0.08]));
+        const b = MZ.hash(x * 11 + j, y + i, 75);
+        leds.blinks.push(b < 0.5 ? 0 : 0.5 + b, b * 4);
+      }
+      colliders.push([
+        Math.min(bx - 0.9 * Math.abs(cos), bx - 0.45 * Math.abs(sin)),
+        Math.min(bz - 0.9 * Math.abs(sin), bz - 0.45 * Math.abs(cos)),
+        Math.max(bx + 0.9 * Math.abs(cos), bx + 0.45 * Math.abs(sin)),
+        Math.max(bz + 0.9 * Math.abs(sin), bz + 0.45 * Math.abs(cos))
+      ]);
+    }
   }
 
   placeRackRow(x, y, side, count, racks, leds, colliders) {

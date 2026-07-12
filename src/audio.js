@@ -179,9 +179,10 @@ export class AudioScape {
     clickHP.connect(clickGain); clickGain.connect(gain);
 
     return {
-      panner, gain, clickHP, fanGain, fanBP, whineGain,
-      fanBase: fanGain.gain.value, whineBase: whineGain.gain.value, fanFreq: fanBP.frequency.value,
-      active: false, nextClick: 0, target: null
+      panner, gain, clickHP, fanGain, fanBP, whineGain, whineOsc: whine, whineBP,
+      fanBase: fanGain.gain.value, whineBase: whineGain.gain.value,
+      fanFreq: fanBP.frequency.value, whineFreq: whine.frequency.value,
+      active: false, isBattery: false, nextClick: 0, target: null
     };
   }
 
@@ -518,6 +519,16 @@ export class AudioScape {
           em.target = r;
           this.setEmitterPos(em.panner, r.x, r.y, r.z);
           em.gain.gain.setTargetAtTime(0.55, ctx.currentTime, 0.4);
+          // battery cabinets drone at mains frequency instead of fan wash
+          const bat = r.type === 'battery';
+          if (bat !== em.isBattery) {
+            em.isBattery = bat;
+            const t = ctx.currentTime;
+            em.fanBP.frequency.setTargetAtTime(bat ? 85 : em.fanFreq, t, 0.5);
+            em.whineOsc.frequency.setTargetAtTime(bat ? 120 : em.whineFreq, t, 0.5);
+            em.whineBP.frequency.setTargetAtTime(bat ? 120 : em.whineFreq, t, 0.5);
+            em.whineGain.gain.setTargetAtTime(bat ? em.whineBase * 3.5 : em.whineBase, t, 0.5);
+          }
         } else {
           em.active = false;
           em.gain.gain.setTargetAtTime(0, ctx.currentTime, 0.4);
@@ -531,9 +542,9 @@ export class AudioScape {
       }
     }
 
-    // hard-drive click bursts on active rack emitters
+    // hard-drive click bursts on active rack emitters (batteries don't seek)
     for (const em of this.rackEmitters) {
-      if (!em.active) continue;
+      if (!em.active || em.isBattery) continue;
       if (this.time >= em.nextClick) {
         const burst = 1 + Math.floor(Math.random() * 5);
         for (let i = 0; i < burst; i++) {

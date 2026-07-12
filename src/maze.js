@@ -35,16 +35,34 @@ export function hash(x, y, salt) {
 
 const ZONE_SIZE = 14; // cells per zone super-cell
 
-export const ZONES = { SERVER: 'server', OFFICE: 'office', DARK: 'dark', HALL: 'hall' };
+export const ZONES = {
+  SERVER: 'server',   // ordinary aisles: racks along walls
+  STACKS: 'stacks',   // dense freestanding rack rows, shoulder-width aisles
+  OFFICE: 'office',
+  NOC: 'noc',         // network operations: console rows, glowing wall screens
+  BATTERY: 'battery', // UPS cabinets, amber LEDs, deep hum, mostly dark
+  DARK: 'dark',
+  HALL: 'hall'
+};
 
 export function zoneAt(x, y) {
   const zx = Math.floor(x / ZONE_SIZE);
   const zy = Math.floor(y / ZONE_SIZE);
   const z = hash(zx, zy, S_ZONE);
-  if (z < 0.42) return ZONES.SERVER;
-  if (z < 0.68) return ZONES.OFFICE;
-  if (z < 0.87) return ZONES.DARK;
+  if (z < 0.26) return ZONES.SERVER;
+  if (z < 0.42) return ZONES.STACKS;
+  if (z < 0.58) return ZONES.OFFICE;
+  if (z < 0.66) return ZONES.NOC;
+  if (z < 0.72) return ZONES.BATTERY;
+  if (z < 0.88) return ZONES.DARK;
   return ZONES.HALL;
+}
+
+/** Uniform console-row facing for a NOC super-cell. */
+export function nocFacing(x, y) {
+  const zx = Math.floor(x / ZONE_SIZE);
+  const zy = Math.floor(y / ZONE_SIZE);
+  return Math.floor(hash(zx, zy, 16) * 4) * Math.PI / 2;
 }
 
 // Server zones lay their racks in coherent aisles: 'x' aisles run east-west.
@@ -82,8 +100,11 @@ function carvesNorth(x, y) {
 
 function braidChance(x, y) {
   const zone = zoneAt(x, y);
-  if (zone === ZONES.HALL) return 0.55; // halls are wide open
+  if (zone === ZONES.HALL) return 0.55;   // halls are wide open
+  if (zone === ZONES.NOC) return 0.6;     // one big room; the desks divide it
+  if (zone === ZONES.STACKS) return 0.36; // rack rows do the enclosing instead
   if (zone === ZONES.SERVER) return 0.26; // long aisles need loops
+  if (zone === ZONES.BATTERY) return 0.24;
   return 0.16;
 }
 
@@ -122,10 +143,16 @@ export function fixtureAt(x, y) {
   let state;
   if (zone === ZONES.HALL) {
     state = s < 0.6 ? FIX.ON : s < 0.75 ? FIX.FLICKER : s < 0.82 ? FIX.DYING : FIX.DEAD;
+  } else if (zone === ZONES.NOC) {
+    state = s < 0.5 ? FIX.ON : s < 0.7 ? FIX.FLICKER : s < 0.78 ? FIX.DYING : FIX.DEAD;
   } else if (zone === ZONES.SERVER) {
     state = s < 0.22 ? FIX.ON : s < 0.34 ? FIX.FLICKER : s < 0.42 ? FIX.DYING : FIX.DEAD;
+  } else if (zone === ZONES.STACKS) {
+    state = s < 0.13 ? FIX.ON : s < 0.24 ? FIX.FLICKER : s < 0.33 ? FIX.DYING : FIX.DEAD;
   } else if (zone === ZONES.OFFICE) {
     state = s < 0.28 ? FIX.ON : s < 0.42 ? FIX.FLICKER : s < 0.5 ? FIX.DYING : FIX.DEAD;
+  } else if (zone === ZONES.BATTERY) {
+    state = s < 0.07 ? FIX.ON : s < 0.13 ? FIX.FLICKER : s < 0.26 ? FIX.DYING : FIX.DEAD;
   } else { // dark
     state = s < 0.05 ? FIX.DYING : FIX.DEAD;
   }
@@ -145,6 +172,20 @@ export function rackSides(x, y) {
   if (inRoom(x, y)) return null;
   const zone = zoneAt(x, y);
   const sides = [];
+  if (zone === ZONES.STACKS) {
+    // Freestanding rows on cell edges, walls or not — the racks ARE the
+    // walls here. Edge-keyed hashes so both neighbouring cells agree, and
+    // ~25% of edges stay clear as cross-cuts so the stacks never seal shut.
+    const axis = aisleAxis(x, y);
+    if (axis === 'y') {
+      if (hash(x, y, 28) < 0.75) sides.push({ side: 'E', count: 2 });
+      if (hash(x - 1, y, 28) < 0.75) sides.push({ side: 'W', count: 2 });
+    } else {
+      if (hash(x, y, 29) < 0.75) sides.push({ side: 'S', count: 2 });
+      if (hash(x, y - 1, 29) < 0.75) sides.push({ side: 'N', count: 2 });
+    }
+    return sides.length ? sides : null;
+  }
   if (zone === ZONES.SERVER) {
     const base = 0.78;
     const axis = aisleAxis(x, y);
@@ -175,6 +216,61 @@ export function rackSides(x, y) {
   return sides.length ? sides : null;
 }
 
+/**
+ * UPS cabinet rows for battery-room cells. Same freestanding edge logic as
+ * the stacks, lower density, so the room reads as heavy equipment rows.
+ */
+export function batterySides(x, y) {
+  if (zoneAt(x, y) !== ZONES.BATTERY || inRoom(x, y)) return null;
+  const sides = [];
+  const axis = aisleAxis(x, y);
+  if (axis === 'y') {
+    if (hash(x, y, 30) < 0.68) sides.push('E');
+    if (hash(x - 1, y, 30) < 0.68) sides.push('W');
+  } else {
+    if (hash(x, y, 31) < 0.68) sides.push('S');
+    if (hash(x, y - 1, 31) < 0.68) sides.push('N');
+  }
+  return sides.length ? sides : null;
+}
+
+/** Glowing status screen mounted on a NOC wall ('N'|'S'|'E'|'W' or null). */
+export function wallScreenAt(x, y) {
+  if (zoneAt(x, y) !== ZONES.NOC) return null;
+  const r = hash(x, y, 32);
+  if (r > 0.24) return null;
+  const order = ['N', 'E', 'S', 'W'];
+  const start = Math.floor(r * 40) % 4;
+  const has = { N: wallN(x, y), S: wallS(x, y), E: wallE(x, y), W: wallW(x, y) };
+  for (let i = 0; i < 4; i++) {
+    const s = order[(start + i) % 4];
+    if (has[s]) return s;
+  }
+  return null;
+}
+
+/**
+ * Disturbed raised floor: a tile lifted out, leaving a dark opening —
+ * sometimes with the sub-floor glowing faint red through it.
+ */
+export function floorDisturbAt(x, y) {
+  const zone = zoneAt(x, y);
+  let p;
+  if (zone === ZONES.STACKS) p = 0.09;
+  else if (zone === ZONES.BATTERY) p = 0.08;
+  else if (zone === ZONES.SERVER) p = 0.055;
+  else if (zone === ZONES.DARK) p = 0.04;
+  else return null;
+  if (hash(x, y, 51) > p) return null;
+  return {
+    ox: (hash(x, y, 52) - 0.5) * 1.8,
+    oz: (hash(x, y, 53) - 0.5) * 1.8,
+    ry: hash(x, y, 54) * Math.PI,
+    glow: hash(x, y, 55) < 0.4,
+    cables: hash(x, y, 56) < 0.55
+  };
+}
+
 // ---------------------------------------------------------- workstations ----
 
 /**
@@ -186,9 +282,11 @@ export function workstationAt(x, y) {
   const zone = zoneAt(x, y);
   const room = inRoom(x, y);
   let p;
-  if (zone === ZONES.OFFICE || room) p = 0.08;
+  if (zone === ZONES.NOC) p = 0.4; // console rows
+  else if (zone === ZONES.OFFICE || room) p = 0.08;
   else if (zone === ZONES.SERVER) p = 0.025;
   else if (zone === ZONES.DARK) p = 0.02;
+  else if (zone === ZONES.STACKS || zone === ZONES.BATTERY) p = 0.012;
   else p = 0.015;
   if (hash(x, y, 23) > p) return null;
   return { seed: Math.floor(hash(x, y, 24) * 0xffff) };
@@ -205,7 +303,10 @@ export function propsAt(x, y) {
   const room = inRoom(x, y);
   const r = hash(x, y, S_PROP);
   const out = { desk: false, chair: false, cabinet: false, papers: 0 };
-  if (zone === ZONES.OFFICE || room) {
+  if (zone === ZONES.NOC) {
+    if (r < 0.25) out.chair = true; // chairs pushed back from the consoles
+    if (hash(x, y, S_PROP + 2) < 0.3) out.papers = 1 + Math.floor(hash(x, y, S_PROP + 3) * 3);
+  } else if (zone === ZONES.OFFICE || room) {
     if (r < 0.14) { out.desk = true; out.chair = hash(x, y, S_PROP + 1) < 0.7; }
     else if (r < 0.22) out.cabinet = true;
     else if (r < 0.27) out.chair = true;
@@ -225,8 +326,11 @@ export function pillarAt(x, y) {
 /** Overhead cable tray direction for a corridor cell ('x' | 'y' | null). */
 export function trayAt(x, y) {
   const zone = zoneAt(x, y);
-  if (zone !== ZONES.SERVER && zone !== ZONES.DARK) return null;
-  if (hash(x, y, 18) > 0.85) return null;
+  const cap = zone === ZONES.STACKS ? 0.55
+    : zone === ZONES.SERVER || zone === ZONES.BATTERY ? 0.85
+    : zone === ZONES.DARK ? 0.85 : null;
+  if (cap === null) return null;
+  if (hash(x, y, 18) > cap) return null;
   if (!wallN(x, y) && !wallS(x, y)) return 'y';
   if (!wallE(x, y) && !wallW(x, y)) return 'x';
   return null;
@@ -235,9 +339,12 @@ export function trayAt(x, y) {
 /** A cable hanging loose from the ceiling. */
 export function hangingCableAt(x, y) {
   const zone = zoneAt(x, y);
-  if (zone !== ZONES.SERVER && zone !== ZONES.DARK) return null;
+  const cap = zone === ZONES.STACKS ? 0.18
+    : zone === ZONES.BATTERY ? 0.12
+    : zone === ZONES.SERVER || zone === ZONES.DARK ? 0.09 : null;
+  if (cap === null) return null;
   const r = hash(x, y, 19);
-  if (r > 0.09) return null;
+  if (r > cap) return null;
   return {
     ox: (hash(x, y, 19 + 1) - 0.5) * (CELL - 1.2),
     oz: (hash(x, y, 19 + 2) - 0.5) * (CELL - 1.2),

@@ -10,6 +10,10 @@ There are no objectives, no combat, and no exits. Only aisles.
 | --- | --- | --- |
 | ![server aisle](docs/screenshot-server-aisle.jpg) | ![fluorescent](docs/screenshot-fluorescent.jpg) | ![office](docs/screenshot-office.jpg) |
 
+| | |
+| --- | --- |
+| ![the stacks](docs/screenshot-stacks.jpg) | ![the NOC](docs/screenshot-noc.jpg) |
+
 ![terminal](docs/screenshot-terminal.jpg)
 
 ## Play
@@ -52,9 +56,16 @@ Headphones strongly recommended.
 - **Infinite maze** — the world is a pure function of integer cell
   coordinates and a seed (`src/maze.js`). A binary-tree carve guarantees every
   cell is reachable; braiding adds loops, hash-stamped rooms and large-scale
-  zones (server farms, abandoned offices, dark sectors, open halls) give the
-  labyrinth texture. Nothing is stored: any region can be generated locally,
-  forever, in any direction.
+  biomes give the labyrinth texture: ordinary **server aisles**, **the
+  stacks** (freestanding back-to-back rack rows squeezing corridors to
+  shoulder width — the racks are the walls), abandoned **offices**, **the
+  NOC** (rows of consoles all facing the same way under glowing status
+  walls), **the battery room** (heavy UPS cabinets droning at mains
+  frequency, amber and red charge LEDs, almost no working lights), **dark
+  sectors** and open **halls**. Racks-heavy biomes also have disturbed
+  raised floor: tiles lifted out and set down askew, dark openings with
+  cables snaking up, some glowing faint red from the sub-floor. Nothing is
+  stored: any region can be generated locally, forever, in any direction.
 - **Chunk streaming** — `src/world.js` bakes 8×8-cell chunks into instanced
   meshes (walls, racks, LEDs, fluorescents, furniture, cable trays) and
   streams them around the player. Fog hides the horizon. Server zones lay

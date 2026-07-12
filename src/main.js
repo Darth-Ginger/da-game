@@ -29,8 +29,9 @@ const camera = new THREE.PerspectiveCamera(72, window.innerWidth / window.innerH
 scene.add(new THREE.HemisphereLight(0x3d4a41, 0x171814, 1.9));
 
 // camcorder light: a weak cold lamp riding on the camera
-const CAM_LIGHT = 24;
-const camLight = new THREE.PointLight(0xc8e0d2, CAM_LIGHT, 15, 1.5);
+// flat decay: keeps near surfaces from blowing out while still reaching down the aisle
+const CAM_LIGHT = 11;
+const camLight = new THREE.PointLight(0xc8e0d2, CAM_LIGHT, 15, 0.9);
 scene.add(camLight);
 let camLightOn = true;
 
