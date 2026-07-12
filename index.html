@@ -69,6 +69,105 @@
     }
     @keyframes blink { 50% { opacity: 0; } }
 
+    /* ---- workstation interaction ---- */
+    #interactPrompt {
+      position: fixed;
+      left: 50%;
+      bottom: 18vh;
+      transform: translateX(-50%);
+      padding: 10px 20px;
+      font-family: "Courier New", Courier, monospace;
+      font-size: clamp(13px, 1.8vw, 17px);
+      letter-spacing: 0.22em;
+      color: #cfe3cf;
+      background: rgba(0, 0, 0, 0.45);
+      border: 2px solid rgba(200, 230, 205, 0.45);
+      border-radius: 4px;
+      text-shadow: 0 0 6px rgba(180, 255, 200, 0.6);
+      z-index: 6;
+      cursor: pointer;
+    }
+    #interactPrompt.hidden { display: none; }
+
+    #terminal {
+      position: fixed;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      width: min(760px, 92vw);
+      height: min(480px, 76vh);
+      background: #041006;
+      border: 3px solid #1a3a22;
+      border-radius: 10px;
+      box-shadow: 0 0 60px rgba(30, 255, 120, 0.18), inset 0 0 80px rgba(0, 0, 0, 0.85);
+      z-index: 8;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    #terminal.hidden { display: none; }
+    #terminal::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background: repeating-linear-gradient(
+        to bottom,
+        rgba(120, 255, 160, 0.045) 0px,
+        rgba(120, 255, 160, 0.045) 1px,
+        rgba(0, 0, 0, 0) 2px,
+        rgba(0, 0, 0, 0) 3px
+      );
+    }
+    #termScroll {
+      flex: 1;
+      overflow-y: auto;
+      padding: 18px 22px 6px 22px;
+      font-family: "Courier New", Courier, monospace;
+      font-size: clamp(11px, 1.5vw, 15px);
+      line-height: 1.35;
+      color: #8fe3a2;
+      text-shadow: 0 0 5px rgba(120, 255, 160, 0.55);
+      scrollbar-width: none;
+    }
+    #termScroll::-webkit-scrollbar { display: none; }
+    #termText {
+      margin: 0;
+      white-space: pre-wrap;
+      word-break: break-all;
+      font: inherit;
+    }
+    #termLine { white-space: pre-wrap; word-break: break-all; }
+    #termCursor {
+      display: inline-block;
+      width: 0.62em;
+      height: 1em;
+      vertical-align: text-bottom;
+      background: #8fe3a2;
+      box-shadow: 0 0 6px rgba(120, 255, 160, 0.8);
+      animation: blink 1.05s steps(2, start) infinite;
+    }
+    #termClose {
+      padding: 8px 22px 10px 22px;
+      font-family: "Courier New", Courier, monospace;
+      font-size: 11px;
+      letter-spacing: 0.28em;
+      color: rgba(143, 227, 162, 0.55);
+      text-align: right;
+      cursor: pointer;
+      user-select: none;
+    }
+    #termKbd {
+      position: absolute;
+      opacity: 0;
+      width: 1px;
+      height: 1px;
+      left: -100px;
+      top: 0;
+      border: 0;
+      padding: 0;
+    }
+
     /* ---- touch controls (shown only on touch devices, in-game) ---- */
     #touchUI { display: none; }
     body.touch-playing #touchUI { display: block; }
@@ -148,6 +247,17 @@
   <div id="touchUI">
     <div id="joyBase"><div id="joyKnob"></div></div>
     <button id="btnLight">&#9788; LIGHT</button>
+  </div>
+
+  <div id="interactPrompt" class="hidden">[E] INSPECT TERMINAL</div>
+
+  <div id="terminal" class="hidden">
+    <div id="termScroll">
+      <pre id="termText"></pre>
+      <div id="termLine"><span id="termPrompt">&gt; </span><span id="termInput"></span><span id="termCursor"></span></div>
+    </div>
+    <div id="termClose">[ESC] STEP AWAY</div>
+    <input id="termKbd" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" />
   </div>
 
   <script type="module" src="/src/main.js"></script>

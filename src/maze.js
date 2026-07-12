@@ -135,26 +135,63 @@ export function fixtureAt(x, y) {
 // ---------------------------------------------------------------- racks ----
 
 /**
- * Which sides of cell (x, y) carry a row of server racks.
- * Racks hug existing walls, only in server zones (rare strays elsewhere),
- * never inside rooms, and follow the zone's aisle direction so rows read as
- * long coherent server aisles.
+ * Which sides of cell (x, y) carry server racks.
+ * Server zones lay dense, coherent rows along the zone's aisle axis; every
+ * other zone gets intermittent strays — single abandoned cabinets against
+ * whatever wall was nearest, still powered, blinking at nobody.
+ * Returns null or a list of { side, count } (count: racks in the row).
  */
 export function rackSides(x, y) {
   if (inRoom(x, y)) return null;
   const zone = zoneAt(x, y);
-  const base = zone === ZONES.SERVER ? 0.78 : zone === ZONES.DARK ? 0.08 : 0.0;
-  if (base === 0) return null;
-  const axis = aisleAxis(x, y);
   const sides = [];
-  if (axis === 'y') { // aisles run north-south -> racks on east/west walls
-    if (wallE(x, y) && hash(x, y, S_RACK) < base) sides.push('E');
-    if (wallW(x, y) && hash(x, y, S_RACK + 1) < base) sides.push('W');
+  if (zone === ZONES.SERVER) {
+    const base = 0.78;
+    const axis = aisleAxis(x, y);
+    if (axis === 'y') { // aisles run north-south -> racks on east/west walls
+      if (wallE(x, y) && hash(x, y, S_RACK) < base) sides.push({ side: 'E', count: 2 });
+      if (wallW(x, y) && hash(x, y, S_RACK + 1) < base) sides.push({ side: 'W', count: 2 });
+    } else {
+      if (wallS(x, y) && hash(x, y, S_RACK) < base) sides.push({ side: 'S', count: 2 });
+      if (wallN(x, y) && hash(x, y, S_RACK + 1) < base) sides.push({ side: 'N', count: 2 });
+    }
   } else {
-    if (wallS(x, y) && hash(x, y, S_RACK) < base) sides.push('S');
-    if (wallN(x, y) && hash(x, y, S_RACK + 1) < base) sides.push('N');
+    const base = zone === ZONES.DARK ? 0.2 : zone === ZONES.OFFICE ? 0.07 : 0.06;
+    const r = hash(x, y, S_RACK + 2);
+    if (r < base) {
+      // pick one walled side for the stray cabinet
+      const order = ['E', 'W', 'S', 'N'];
+      const start = Math.floor(hash(x, y, S_RACK + 3) * 4);
+      const has = { E: wallE(x, y), W: wallW(x, y), S: wallS(x, y), N: wallN(x, y) };
+      for (let i = 0; i < 4; i++) {
+        const side = order[(start + i) % 4];
+        if (has[side]) {
+          sides.push({ side, count: hash(x, y, S_RACK + 4) < 0.3 ? 2 : 1 });
+          break;
+        }
+      }
+    }
   }
   return sides.length ? sides : null;
+}
+
+// ---------------------------------------------------------- workstations ----
+
+/**
+ * An abandoned computer workstation (desk + CRT + keyboard) for a cell.
+ * Common in offices and rooms, occasional monitoring consoles in server
+ * aisles, rare strays glowing alone in dark corridors and halls.
+ */
+export function workstationAt(x, y) {
+  const zone = zoneAt(x, y);
+  const room = inRoom(x, y);
+  let p;
+  if (zone === ZONES.OFFICE || room) p = 0.08;
+  else if (zone === ZONES.SERVER) p = 0.025;
+  else if (zone === ZONES.DARK) p = 0.02;
+  else p = 0.015;
+  if (hash(x, y, 23) > p) return null;
+  return { seed: Math.floor(hash(x, y, 24) * 0xffff) };
 }
 
 // ------------------------------------------------------------ furniture ----

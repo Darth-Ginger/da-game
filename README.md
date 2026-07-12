@@ -10,6 +10,8 @@ There are no objectives, no combat, and no exits. Only aisles.
 | --- | --- | --- |
 | ![server aisle](docs/screenshot-server-aisle.jpg) | ![fluorescent](docs/screenshot-fluorescent.jpg) | ![office](docs/screenshot-office.jpg) |
 
+![terminal](docs/screenshot-terminal.jpg)
+
 ## Play
 
 **In a browser:** the game auto-deploys to GitHub Pages on every push —
@@ -33,7 +35,8 @@ Headphones strongly recommended.
 | Mouse | Look |
 | `Shift` | Run |
 | `F` | Toggle camcorder light |
-| `Esc` | Pause |
+| `E` | Inspect a workstation terminal |
+| `Esc` | Pause / step away from a terminal |
 
 | Touch (phone / tablet) | Action |
 | --- | --- |
@@ -42,6 +45,7 @@ Headphones strongly recommended.
 | Push stick to the rim | Run |
 | Right thumb drag | Look |
 | `☼ LIGHT` button | Toggle camcorder light |
+| `INSPECT TERMINAL` button | Use a workstation (tap the screen to type) |
 
 ## How it works
 
@@ -53,7 +57,15 @@ Headphones strongly recommended.
   forever, in any direction.
 - **Chunk streaming** — `src/world.js` bakes 8×8-cell chunks into instanced
   meshes (walls, racks, LEDs, fluorescents, furniture, cable trays) and
-  streams them around the player. Fog hides the horizon.
+  streams them around the player. Fog hides the horizon. Server zones lay
+  dense rack aisles; every other zone gets intermittent stray cabinets,
+  still powered, blinking at nobody.
+- **Workstation terminals** — abandoned desks with glowing CRTs scattered
+  through the facility (`src/terminal.js`). Walk up and press `E` (or tap)
+  to lean into a phosphor-green console with a blinking cursor. It echoes
+  anything you type, clears the line on Enter, runs nothing, and — left
+  alone — occasionally scrolls bursts of maintenance-log nonsense that is
+  almost, but not quite, plausible.
 - **VHS camcorder** — the scene renders into a 480-line target, then a single
   post pass (`src/vhs.js`) adds barrel distortion, chroma bleed, line jitter,
   tracking bands, head-switching noise, scanlines, grain, dropouts and a

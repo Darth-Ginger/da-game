@@ -136,6 +136,7 @@ export function makeMaterials() {
     metalDark: new THREE.MeshStandardMaterial({ color: 0x23262b, roughness: 0.7, metalness: 0.4 }),
     furniture: new THREE.MeshStandardMaterial({ color: 0x4a4438, roughness: 0.9, metalness: 0.05 }),
     furnitureMetal: new THREE.MeshStandardMaterial({ color: 0x555a5e, roughness: 0.65, metalness: 0.5 }),
+    plastic: new THREE.MeshStandardMaterial({ color: 0x45433c, roughness: 0.85, metalness: 0.05 }),
     paper: new THREE.MeshStandardMaterial({ color: 0x8d8c80, roughness: 1.0 }),
     fixtureHousing: new THREE.MeshStandardMaterial({ color: 0x2e3230, roughness: 0.8, metalness: 0.3 }),
     cable: new THREE.MeshStandardMaterial({ color: 0x101014, roughness: 0.85 })

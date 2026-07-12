@@ -4,6 +4,7 @@ import { Player } from './player.js';
 import { VHSPass } from './vhs.js';
 import { AudioScape } from './audio.js';
 import { TouchControls } from './touch.js';
+import { Terminal } from './terminal.js';
 import * as MZ from './maze.js';
 
 const app = document.getElementById('app');
@@ -13,7 +14,7 @@ const pauseScreen = document.getElementById('pauseScreen');
 const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance' });
 renderer.setPixelRatio(1); // the VHS target defines the real resolution
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.5;
+renderer.toneMappingExposure = 1.6;
 app.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
@@ -23,7 +24,7 @@ scene.fog = new THREE.FogExp2(0x010201, 0.055);
 const camera = new THREE.PerspectiveCamera(72, window.innerWidth / window.innerHeight, 0.08, 120);
 
 // barely-there ambient so unlit areas stay readable as shapes
-scene.add(new THREE.HemisphereLight(0x3a473e, 0x141511, 1.5));
+scene.add(new THREE.HemisphereLight(0x3d4a41, 0x171814, 1.9));
 
 // camcorder light: a weak cold lamp riding on the camera
 const CAM_LIGHT = 24;
@@ -46,12 +47,32 @@ function toggleLight() {
 }
 touch.onLight = toggleLight;
 
+// ---- workstation terminals ----
+const terminal = new Terminal(audio);
+const interactPrompt = document.getElementById('interactPrompt');
+let interactTarget = null;
+
+terminal.onClose = () => {
+  player.enabled = true;
+  if (!touch.active) lockPointer();
+};
+
+function openTerminal() {
+  if (!interactTarget || terminal.open) return;
+  player.enabled = false;
+  interactPrompt.classList.add('hidden');
+  if (!touch.active && document.pointerLockElement) document.exitPointerLock();
+  terminal.openFor(interactTarget);
+}
+interactPrompt.addEventListener('click', openTerminal);
+
 if (touch.active) {
   document.getElementById('playPrompt').innerHTML = '&#9654; TAP TO INSERT TAPE';
   document.getElementById('controlsHint').innerHTML =
     'LEFT THUMB &mdash; MOVE&emsp;&emsp;RIGHT THUMB &mdash; LOOK<br />' +
     'PUSH STICK TO THE RIM &mdash; RUN&emsp;&emsp;&#9788; &mdash; CAMERA LIGHT<br />' +
     'HEADPHONES RECOMMENDED';
+  interactPrompt.textContent = 'INSPECT TERMINAL';
 }
 
 let started = false;
@@ -84,7 +105,7 @@ startScreen.addEventListener('click', begin);
 pauseScreen.addEventListener('click', begin);
 
 document.addEventListener('pointerlockchange', () => {
-  if (touch.active) return; // no pointer lock in the touch flow
+  if (touch.active || terminal.open) return; // terminal manages its own unlock
   const locked = document.pointerLockElement === renderer.domElement;
   if (!locked && started) {
     player.enabled = false;
@@ -96,7 +117,12 @@ document.addEventListener('pointerlockchange', () => {
 });
 
 document.addEventListener('keydown', e => {
-  if (e.code === 'KeyF' && started) toggleLight();
+  if (!started || terminal.open) return;
+  if (e.code === 'KeyF') toggleLight();
+  if (e.code === 'KeyE' && interactTarget) {
+    e.preventDefault(); // keep the "e" out of the terminal input
+    openTerminal();
+  }
 });
 
 window.addEventListener('resize', () => {
@@ -106,6 +132,7 @@ window.addEventListener('resize', () => {
 });
 
 const clock = new THREE.Clock();
+const _fwd = new THREE.Vector3();
 
 // Prime the world before the first frame so there is no naked pop-in
 world.update(player.pos, 0);
@@ -116,14 +143,22 @@ function animate() {
   player.update(dt, world);
   world.update(player.pos, dt);
   audio.update(dt, camera, world, player.pos);
+  terminal.update(dt);
+
+  if (started && !terminal.open) {
+    interactTarget = world.interactableAt(camera.position, camera.getWorldDirection(_fwd));
+    interactPrompt.classList.toggle('hidden', !interactTarget);
+  } else {
+    interactTarget = interactTarget && terminal.open ? interactTarget : null;
+  }
 
   camLight.position.copy(camera.position);
   camLight.intensity += ((camLightOn ? CAM_LIGHT : 0) - camLight.intensity) * Math.min(1, dt * 14);
 
-  vhs.render(scene, camera, dt, player.enabled);
+  vhs.render(scene, camera, dt, player.enabled || terminal.open);
   requestAnimationFrame(animate);
 }
 animate();
 
 // headless / automation hook
-window.__game = { begin, player, world, maze: MZ };
+window.__game = { begin, player, world, maze: MZ, terminal };

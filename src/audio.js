@@ -236,6 +236,40 @@ export class AudioScape {
     src.start(now, Math.random() * 1.5, 0.2);
   }
 
+  /** Keyboard clack for terminal typing. */
+  uiClick() {
+    if (!this.started) return;
+    const ctx = this.ctx;
+    const now = ctx.currentTime;
+    const src = ctx.createBufferSource();
+    src.buffer = this.clickBuf;
+    src.playbackRate.value = 0.9 + Math.random() * 0.5;
+    const hp = ctx.createBiquadFilter();
+    hp.type = 'highpass';
+    hp.frequency.value = 1800;
+    const env = ctx.createGain();
+    env.gain.setValueAtTime(0.12, now);
+    env.gain.exponentialRampToValueAtTime(0.001, now + 0.03);
+    src.connect(hp); hp.connect(env); env.connect(this.master);
+    src.start(now);
+  }
+
+  /** CRT engage/disengage blip for opening or closing the terminal. */
+  uiBlip(down = false) {
+    if (!this.started) return;
+    const ctx = this.ctx;
+    const now = ctx.currentTime;
+    const o = ctx.createOscillator();
+    o.type = 'square';
+    o.frequency.setValueAtTime(down ? 880 : 520, now);
+    o.frequency.exponentialRampToValueAtTime(down ? 320 : 1240, now + 0.09);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.045, now);
+    g.gain.exponentialRampToValueAtTime(0.001, now + 0.14);
+    o.connect(g); g.connect(this.master);
+    o.start(now); o.stop(now + 0.16);
+  }
+
   distantGroan() {
     const ctx = this.ctx;
     const now = ctx.currentTime;

@@ -130,6 +130,21 @@ function buildGeometries() {
   ]);
 
   geos.cabinet = boxAt(0.55, 1.35, 0.62, 0, 0.675, 0);
+
+  // workstation: split into desk (wood) and hardware (plastic) so the two
+  // instanced meshes can carry different materials while sharing matrices
+  geos.wsDesk = mergeGeometries([
+    boxAt(1.3, 0.05, 0.68, 0, 0.72, 0.05),
+    boxAt(0.05, 0.7, 0.62, -0.6, 0.35, 0.05),
+    boxAt(0.05, 0.7, 0.62, 0.6, 0.35, 0.05)
+  ]);
+  geos.wsHardware = mergeGeometries([
+    boxAt(0.42, 0.38, 0.4, 0, 0.94, -0.06),    // CRT monitor
+    boxAt(0.46, 0.04, 0.34, 0, 0.7, -0.06),    // monitor plinth
+    boxAt(0.42, 0.025, 0.15, 0, 0.76, 0.25),   // keyboard
+    boxAt(0.19, 0.48, 0.44, 0.42, 0.24, 0.05)  // tower under the desk
+  ]);
+  geos.screen = new THREE.PlaneGeometry(0.3, 0.24);
   geos.paper = new THREE.PlaneGeometry(0.21, 0.3);
   geos.paper.rotateX(-Math.PI / 2);
   geos.pillar = new THREE.BoxGeometry(0.5, WALL_H, 0.5);
@@ -293,6 +308,32 @@ export class World {
     return { racks: racks.slice(0, 4), lights: lights.slice(0, 3).map(l => l.f) };
   }
 
+  /**
+   * The workstation the player could interact with right now: within reach,
+   * on the screen side of the desk, and roughly in the middle of the view.
+   */
+  interactableAt(camPos, camFwd) {
+    let best = null, bestD2 = 2.4 * 2.4;
+    const ccx = Math.floor(camPos.x / CHUNK_M), ccy = Math.floor(camPos.z / CHUNK_M);
+    for (let gy = ccy - 1; gy <= ccy + 1; gy++) {
+      for (let gx = ccx - 1; gx <= ccx + 1; gx++) {
+        const chunk = this.chunks.get(this.key(gx, gy));
+        if (!chunk) continue;
+        for (const ws of chunk.workstations) {
+          const dx = camPos.x - ws.x, dz = camPos.z - ws.z;
+          const d2 = dx * dx + dz * dz;
+          if (d2 >= bestD2) continue;
+          if (dx * ws.fx + dz * ws.fz < 0.15) continue; // behind the monitor
+          const d = Math.sqrt(d2) || 1e-6;
+          if ((-dx * camFwd.x - dz * camFwd.z) / d < 0.45) continue; // not looking at it
+          best = ws;
+          bestD2 = d2;
+        }
+      }
+    }
+    return best;
+  }
+
   /** Push a circle at (x, z) with radius r out of walls and prop colliders. */
   resolveCollision(x, z, r) {
     for (let pass = 0; pass < 3; pass++) {
@@ -332,11 +373,13 @@ export class World {
   buildChunk(cx, cy) {
     const group = new THREE.Group();
     const walls = [], racks = [], housings = [], tubes = [], desks = [], chairs = [],
-      cabinets = [], papers = [], pillars = [], trays = [], cables = [];
+      cabinets = [], papers = [], pillars = [], trays = [], cables = [], wsMats = [];
     const leds = { mats: [], colors: [], blinks: [] };
+    const screens = { mats: [], colors: [], blinks: [] };
     const tubeGlows = [];
     const fixtures = [];
     const rackPoints = [];
+    const workstations = [];
     const colliders = []; // [minX, minZ, maxX, maxZ]
     const x0 = cx * CHUNK, y0 = cy * CHUNK;
 
@@ -369,14 +412,20 @@ export class World {
         // server racks
         const sides = isSpawn ? null : MZ.rackSides(x, y);
         if (sides) {
-          for (const side of sides) {
-            this.placeRackRow(x, y, side, racks, leds, colliders);
+          for (const s of sides) {
+            this.placeRackRow(x, y, s.side, s.count, racks, leds, colliders);
           }
           rackPoints.push({ x: wx, y: 1.2, z: wz, seed: MZ.hash(x, y, 33) });
         }
 
-        // furniture
-        const props = isSpawn ? null : MZ.propsAt(x, y);
+        // computer workstations (interactable terminals)
+        const ws = isSpawn ? null : MZ.workstationAt(x, y);
+        if (ws) {
+          this.placeWorkstation(x, y, ws, wsMats, screens, workstations, colliders);
+        }
+
+        // furniture (workstation cells keep their floor clear)
+        const props = (isSpawn || ws) ? null : MZ.propsAt(x, y);
         if (props) {
           if (props.desk) {
             const ry = Math.floor(MZ.hash(x, y, 41) * 4) * Math.PI / 2;
@@ -455,6 +504,8 @@ export class World {
     addInst(g.pillar, m.wall, pillars);
     addInst(g.tray, m.metalDark, trays);
     addInst(g.cable, m.cable, cables);
+    addInst(g.wsDesk, m.furniture, wsMats);
+    addInst(g.wsHardware, m.plastic, wsMats);
 
     // fluorescent tubes carry a per-instance glow attribute
     let tubeGlow = null;
@@ -474,6 +525,14 @@ export class World {
       addInst(ledGeo, this.ledMat, leds.mats, true);
     }
 
+    // CRT screens: same emissive shader, dim phosphor-green glow
+    if (screens.mats.length) {
+      const scrGeo = g.screen.clone();
+      scrGeo.setAttribute('aColor', new THREE.InstancedBufferAttribute(new Float32Array(screens.colors), 3));
+      scrGeo.setAttribute('aBlink', new THREE.InstancedBufferAttribute(new Float32Array(screens.blinks), 2));
+      addInst(scrGeo, this.ledMat, screens.mats, true);
+    }
+
     // floor + ceiling slabs
     const cxm = cx * CHUNK_M + CHUNK_M / 2, cym = cy * CHUNK_M + CHUNK_M / 2;
     const floor = new THREE.Mesh(g.floor, m.floor);
@@ -483,10 +542,44 @@ export class World {
     group.add(floor, ceil);
 
     this.scene.add(group);
-    return { cx, cy, group, colliders, fixtures, rackPoints, tubeGlow };
+    return { cx, cy, group, colliders, fixtures, rackPoints, workstations, tubeGlow };
   }
 
-  placeRackRow(x, y, side, racks, leds, colliders) {
+  placeWorkstation(x, y, ws, wsMats, screens, workstations, colliders) {
+    const wx = (x + 0.5) * CELL, wz = (y + 0.5) * CELL;
+    // shove the desk against a wall when there is one; screen faces the room
+    const has = { N: MZ.wallN(x, y), S: MZ.wallS(x, y), E: MZ.wallE(x, y), W: MZ.wallW(x, y) };
+    const order = ['N', 'E', 'S', 'W'];
+    const start = Math.floor(MZ.hash(x, y, 25) * 4);
+    let side = null;
+    for (let i = 0; i < 4; i++) {
+      const s = order[(start + i) % 4];
+      if (has[s]) { side = s; break; }
+    }
+    const BACK = WALL_T / 2 + 0.45;
+    let px = wx, pz = wz, ry;
+    if (side === 'N') { pz = y * CELL + BACK; ry = 0; }              // faces +z
+    else if (side === 'S') { pz = (y + 1) * CELL - BACK; ry = Math.PI; }
+    else if (side === 'W') { px = x * CELL + BACK; ry = Math.PI / 2; } // faces +x
+    else if (side === 'E') { px = (x + 1) * CELL - BACK; ry = -Math.PI / 2; }
+    else { ry = Math.floor(MZ.hash(x, y, 26) * 4) * Math.PI / 2; }     // free-standing
+
+    wsMats.push(composed(px, 0, pz, ry));
+
+    // glowing screen on the CRT face (local: y 0.95, z 0.145)
+    const sin = Math.sin(ry), cos = Math.cos(ry);
+    screens.mats.push(composed(px + 0.145 * sin, 0.95, pz + 0.145 * cos, ry));
+    const flick = MZ.hash(x, y, 27);
+    screens.colors.push(0.12, 0.5, 0.2);
+    // most screens glow steady; a few pulse like a dying backlight
+    if (flick < 0.2) screens.blinks.push(0.6 + flick * 2, flick * 7);
+    else screens.blinks.push(0, 0);
+
+    workstations.push({ x: px, z: pz, fx: sin, fz: cos, seed: ws.seed });
+    colliders.push([px - 0.72, pz - 0.72, px + 0.72, pz + 0.72]);
+  }
+
+  placeRackRow(x, y, side, count, racks, leds, colliders) {
     const D = 0.9, GAP = WALL_T / 2 + D / 2 + 0.03;
     const wx = (x + 0.5) * CELL, wz = (y + 0.5) * CELL;
     let px = wx, pz = wz, ry = 0, tx = 0, tz = 0; // t: tangent along the wall
@@ -495,7 +588,8 @@ export class World {
     if (side === 'S') { pz = (y + 1) * CELL - GAP; ry = Math.PI; tx = 1; }
     if (side === 'N') { pz = y * CELL + GAP; ry = 0; tx = 1; }
 
-    for (let i = -1; i <= 1; i += 2) {
+    const offs = count === 2 ? [-1, 1] : [MZ.hash(x, y, 34) < 0.5 ? -1 : 1];
+    for (const i of offs) {
       const off = i * 0.62;
       const rx = px + tx * off, rz = pz + tz * off;
       racks.push(composed(rx, 0, rz, ry));
