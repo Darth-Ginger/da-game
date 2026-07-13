@@ -74,6 +74,16 @@ Headphones strongly recommended.
 
 ## How it works
 
+- **The cold open** — the game starts before the tape (`src/prologue.js`):
+  seated in a bright, beige, hyper-mundane NOC at 2:41 AM, rendered clean
+  with no VHS filter. Your three monitors show an uneventful inbox, a
+  paused Streamflix, and a game of Minesweeper; the wall band runs a Nagios
+  board and a live facility map. Then Nagios flips to 3 CRITICAL, sections
+  B2/C1/C4 start pulsing on the map, and a mail from the Site Director
+  opens over your game telling you to go walk the floor — analog only.
+  Acknowledging it cuts to black, a cassette seats, and everything after
+  is tape. (Tab skips the intro.)
+
 - **Infinite maze** — the world is a pure function of integer cell
   coordinates and a seed (`src/maze.js`). A binary-tree carve guarantees every
   cell is reachable; braiding adds loops, hash-stamped rooms and large-scale

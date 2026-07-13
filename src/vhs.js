@@ -233,6 +233,11 @@ export class VHSPass {
     this.osdTex.needsUpdate = true;
   }
 
+  /** Zero the tape counter — REC starts the moment the cassette seats. */
+  resetTape() {
+    this.startedAt = performance.now();
+  }
+
   /**
    * Spike the tape damage from outside (0..1). The haunt director fires
    * this as events land, so the glitch reads as cause-and-effect — and

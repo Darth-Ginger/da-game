@@ -197,6 +197,100 @@
       padding: 0;
     }
 
+    /* ---- prologue: email window, prompt, skip, fade ---- */
+    #emailPrompt {
+      position: fixed;
+      left: 50%;
+      bottom: 14vh;
+      transform: translateX(-50%);
+      padding: 10px 20px;
+      font-family: "Courier New", Courier, monospace;
+      font-size: clamp(13px, 1.8vw, 17px);
+      letter-spacing: 0.22em;
+      color: #e8ecdf;
+      background: rgba(20, 24, 30, 0.75);
+      border: 2px solid rgba(200, 220, 240, 0.5);
+      border-radius: 4px;
+      z-index: 7;
+      cursor: pointer;
+    }
+    #emailPrompt.hidden { display: none; }
+
+    #skipHint {
+      position: fixed;
+      right: 20px;
+      bottom: 16px;
+      font-family: "Courier New", Courier, monospace;
+      font-size: 11px;
+      letter-spacing: 0.25em;
+      color: rgba(230, 235, 225, 0.45);
+      z-index: 7;
+      cursor: pointer;
+      user-select: none;
+    }
+    #skipHint.hidden { display: none; }
+
+    #emailWindow {
+      position: fixed;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      width: min(560px, 92vw);
+      max-height: 84vh;
+      overflow-y: auto;
+      background: #ece9d8;
+      border: 1px solid #6a6a6a;
+      box-shadow: 4px 6px 24px rgba(0, 0, 0, 0.6);
+      font-family: Tahoma, "Segoe UI", Arial, sans-serif;
+      font-size: 13px;
+      color: #1a1a1a;
+      z-index: 9;
+    }
+    #emailWindow.hidden { display: none; }
+    #emailWindow .titlebar {
+      background: linear-gradient(90deg, #0a246a, #a6caf0);
+      color: #fff;
+      font-weight: bold;
+      padding: 5px 10px;
+    }
+    #emailWindow .headers {
+      padding: 10px 14px 6px 14px;
+      border-bottom: 1px solid #c4c0b4;
+      background: #f6f4ea;
+      line-height: 1.6;
+    }
+    #emailWindow .body {
+      padding: 14px;
+      line-height: 1.7;
+      background: #fff;
+      white-space: pre-line;
+    }
+    #emailWindow .actions {
+      padding: 10px 14px;
+      text-align: right;
+      background: #ece9d8;
+    }
+    #emailAck {
+      font-family: inherit;
+      font-size: 13px;
+      padding: 7px 16px;
+      background: #e3e0d0;
+      border: 2px outset #fdfbf0;
+      cursor: pointer;
+    }
+    #emailAck:active { border-style: inset; }
+
+    #fadeOverlay {
+      position: fixed;
+      inset: 0;
+      background: #000;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 1.1s ease;
+      z-index: 20;
+    }
+    #fadeOverlay.visible { opacity: 1; }
+
     /* ---- touch controls (shown only on touch devices, in-game) ---- */
     #touchUI { display: none; }
     body.touch-playing #touchUI { display: block; }
@@ -289,6 +383,31 @@
   </div>
 
   <div id="interactPrompt" class="hidden">[E] INSPECT TERMINAL</div>
+
+  <div id="emailPrompt" class="hidden">[E] OPEN EMAIL</div>
+  <div id="skipHint" class="hidden">TAB &mdash; SKIP INTRO &#9656;</div>
+
+  <div id="emailWindow" class="hidden">
+    <div class="titlebar">Epi-Mail &mdash; [ACTION REQUIRED] Env anomalies &mdash; B2 / C1 / C4</div>
+    <div class="headers">
+      <b>From:</b> Halvorsen, R. &lt;r.halvorsen@epimetheus.sys&gt;<br />
+      <b>To:</b> Floor Watch (SL-3)<br />
+      <b>Sent:</b> Sunday, April 05, 2026 2:44 AM<br />
+      <b>Subject:</b> [ACTION REQUIRED] Env anomalies &mdash; sections B2 / C1 / C4
+    </div>
+    <div class="body">Nagios tripped on environmental sensors in three sections inside the last ten minutes &mdash; a temp delta in B2, a door contact in C1 that says it has been open for nine minutes, and a branch load spike in C4. Probably sensor drift. It was "probably sensor drift" last month too.
+
+Cameras on the floor are dark for the duration of the run per EPI-SEC-114, so I need eyes on it the old way. Take the handheld from the security cage and walk B2, C1 and C4. Analog only &mdash; you know the policy. Tape goes to Security when you sign out.
+
+Do not touch the consoles. Watch the drives.
+
+R.H.</div>
+    <div class="actions">
+      <button id="emailAck">Acknowledge &mdash; sign out &amp; take handheld</button>
+    </div>
+  </div>
+
+  <div id="fadeOverlay"></div>
 
   <div id="terminal" class="hidden">
     <div id="termScroll">

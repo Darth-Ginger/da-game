@@ -279,6 +279,69 @@ export class AudioScape {
     this.clickInto(this.master, 0.12);
   }
 
+  // ------------------------------------------------------ prologue cues ----
+
+  /** NOC speaker beep: severity 1 = single soft, 2 = triple urgent. */
+  alertBeep(severity = 1) {
+    if (!this.started) return;
+    const ctx = this.ctx;
+    const n = severity === 2 ? 3 : 1;
+    for (let i = 0; i < n; i++) {
+      const t = ctx.currentTime + i * 0.22;
+      const o = ctx.createOscillator();
+      o.type = 'square';
+      o.frequency.value = severity === 2 ? 1180 : 840;
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.035, t);
+      g.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+      o.connect(g); g.connect(this.master);
+      o.start(t); o.stop(t + 0.14);
+    }
+  }
+
+  /** friendly two-tone new-mail chime */
+  emailDing() {
+    if (!this.started) return;
+    const ctx = this.ctx;
+    for (const [freq, at] of [[660, 0], [990, 0.13]]) {
+      const t = ctx.currentTime + at;
+      const o = ctx.createOscillator();
+      o.type = 'sine';
+      o.frequency.value = freq;
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.06, t);
+      g.gain.exponentialRampToValueAtTime(0.001, t + 0.28);
+      o.connect(g); g.connect(this.master);
+      o.start(t); o.stop(t + 0.3);
+    }
+  }
+
+  /** cassette door, tape seat, transport spin-up — heard over black */
+  tapeInsert() {
+    if (!this.started) return;
+    const ctx = this.ctx;
+    const now = ctx.currentTime;
+    this.clickInto(this.master, 0.3, 900, now + 0.3);       // door open
+    this.clickInto(this.master, 0.4, 600, now + 0.9);       // cassette seats
+    this.clickInto(this.master, 0.25, 1400, now + 1.25);    // door snaps shut
+    // transport motor winding up
+    const src = ctx.createBufferSource();
+    src.buffer = this.noiseBuf;
+    src.loop = true;
+    const bp = ctx.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.frequency.setValueAtTime(160, now + 1.3);
+    bp.frequency.exponentialRampToValueAtTime(900, now + 2.0);
+    bp.Q.value = 3;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, now + 1.3);
+    g.gain.exponentialRampToValueAtTime(0.05, now + 1.7);
+    g.gain.exponentialRampToValueAtTime(0.0001, now + 2.4);
+    src.connect(bp); bp.connect(g); g.connect(this.master);
+    src.start(now + 1.3);
+    src.stop(now + 2.5);
+  }
+
   // ------------------------------------------------ presence / haunt fx ----
 
   /** Someone typing at a keyboard a row over. */

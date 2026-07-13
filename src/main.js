@@ -7,6 +7,7 @@ import { TouchControls } from './touch.js';
 import { Terminal } from './terminal.js';
 import { LiveScreens } from './screens.js';
 import { Haunt } from './haunt.js';
+import { Prologue } from './prologue.js';
 import * as MZ from './maze.js';
 
 const app = document.getElementById('app');
@@ -43,6 +44,29 @@ const touch = new TouchControls(renderer.domElement);
 player.touch = touch;
 const liveScreens = new LiveScreens(scene, audio);
 const haunt = new Haunt({ world, audio, screens: liveScreens, player, camera, vhs });
+
+// the shift starts in the NOC, so the tape does too: spawn in the nearest
+// operations room (skipping cells whose workstation would pin the player)
+(function spawnInNoc() {
+  for (let r = 0; r < 300; r++) {
+    for (let y = -r; y <= r; y += Math.max(1, 2 * r)) {
+      for (let x = -r; x <= r; x++) {
+        if (MZ.zoneAt(x, y) === MZ.ZONES.NOC && !MZ.workstationAt(x, y)) {
+          player.pos.set((x + 0.5) * MZ.CELL, 0, (y + 0.5) * MZ.CELL);
+          return;
+        }
+      }
+    }
+    for (let x = -r; x <= r; x += Math.max(1, 2 * r)) {
+      for (let y = -r + 1; y < r; y++) {
+        if (MZ.zoneAt(x, y) === MZ.ZONES.NOC && !MZ.workstationAt(x, y)) {
+          player.pos.set((x + 0.5) * MZ.CELL, 0, (y + 0.5) * MZ.CELL);
+          return;
+        }
+      }
+    }
+  }
+})();
 
 player.onFootstep = (running, speedFrac) => audio.footstep(running, speedFrac);
 
@@ -82,6 +106,7 @@ if (touch.active) {
 }
 
 let started = false;
+let mode = 'title'; // title -> prologue -> game
 
 function lockPointer() {
   const p = renderer.domElement.requestPointerLock?.();
@@ -89,14 +114,14 @@ function lockPointer() {
   if (p && p.catch) p.catch(() => {});
 }
 
-function begin() {
+const prologue = new Prologue(renderer, audio, touch, lockPointer);
+
+function beginPrologue() {
+  if (mode !== 'title') return;
+  mode = 'prologue';
   startScreen.classList.add('hidden');
-  pauseScreen.classList.add('hidden');
-  started = true;
-  player.enabled = true;
   audio.start();
   if (touch.active) {
-    document.body.classList.add('touch-playing');
     // best effort: immersive landscape on phones (unsupported APIs just no-op)
     const fs = document.documentElement.requestFullscreen?.({ navigationUI: 'hide' });
     if (fs && fs.catch) fs.catch(() => {});
@@ -105,10 +130,27 @@ function begin() {
   } else {
     lockPointer();
   }
+  prologue.start();
 }
 
-startScreen.addEventListener('click', begin);
-pauseScreen.addEventListener('click', begin);
+function startGame() {
+  mode = 'game';
+  started = true;
+  player.enabled = true;
+  vhs.resetTape();
+  if (touch.active) document.body.classList.add('touch-playing');
+  else lockPointer();
+}
+prologue.onFinish = startGame;
+
+function resumeGame() {
+  pauseScreen.classList.add('hidden');
+  player.enabled = true;
+  lockPointer();
+}
+
+startScreen.addEventListener('click', beginPrologue);
+pauseScreen.addEventListener('click', resumeGame);
 
 document.addEventListener('pointerlockchange', () => {
   if (touch.active || terminal.open) return; // terminal manages its own unlock
@@ -134,6 +176,8 @@ document.addEventListener('keydown', e => {
 window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
+  prologue.camera.aspect = camera.aspect;
+  prologue.camera.updateProjectionMatrix();
   vhs.setSize(window.innerWidth, window.innerHeight);
 });
 
@@ -145,6 +189,14 @@ world.update(player.pos, 0);
 
 function animate() {
   const dt = Math.min(clock.getDelta(), 0.05);
+
+  if (mode === 'prologue') {
+    prologue.update(dt);
+    world.update(player.pos, dt); // stream the floor in behind the black
+    renderer.render(prologue.scene, prologue.camera);
+    requestAnimationFrame(animate);
+    return;
+  }
 
   player.update(dt, world);
   world.update(player.pos, dt);
@@ -171,4 +223,4 @@ function animate() {
 animate();
 
 // headless / automation hook
-window.__game = { begin, player, world, maze: MZ, terminal, haunt, liveScreens, audio, vhs };
+window.__game = { begin: beginPrologue, startGame, prologue, player, world, maze: MZ, terminal, haunt, liveScreens, audio, vhs };
