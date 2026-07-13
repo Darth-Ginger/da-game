@@ -50,27 +50,29 @@ player.touch = touch;
 const liveScreens = new LiveScreens(scene, audio);
 const haunt = new Haunt({ world, audio, screens: liveScreens, player, camera, vhs });
 
-// the shift starts in the NOC, so the tape does too: spawn in the nearest
-// operations room (skipping cells whose workstation would pin the player)
-(function spawnInNoc() {
+// The tape starts at the mantrap: find a quiet corridor cell with a north
+// wall to hang the vestibule on, build it, and stand the player just
+// outside its glass — facing the floor, with the way back sealed behind.
+const mantrap = (function spawnAtMantrap() {
+  const ok = (x, y) => {
+    const zone = MZ.zoneAt(x, y);
+    if (zone === MZ.ZONES.STACKS || zone === MZ.ZONES.BATTERY || zone === MZ.ZONES.HALL) return false;
+    return MZ.wallN(x, y) && !MZ.rackSides(x, y) && !MZ.batterySides(x, y) &&
+      !MZ.workstationAt(x, y) && !MZ.inRoom(x, y);
+  };
   for (let r = 0; r < 300; r++) {
     for (let y = -r; y <= r; y += Math.max(1, 2 * r)) {
       for (let x = -r; x <= r; x++) {
-        if (MZ.zoneAt(x, y) === MZ.ZONES.NOC && !MZ.workstationAt(x, y)) {
-          player.pos.set((x + 0.5) * MZ.CELL, 0, (y + 0.5) * MZ.CELL);
-          return;
-        }
-      }
-    }
-    for (let x = -r; x <= r; x += Math.max(1, 2 * r)) {
-      for (let y = -r + 1; y < r; y++) {
-        if (MZ.zoneAt(x, y) === MZ.ZONES.NOC && !MZ.workstationAt(x, y)) {
-          player.pos.set((x + 0.5) * MZ.CELL, 0, (y + 0.5) * MZ.CELL);
-          return;
+        if (ok(x, y)) {
+          const door = world.buildVestibule(x, y);
+          player.pos.set((x + 0.5) * MZ.CELL, 0, y * MZ.CELL + 3.1);
+          player.yaw = Math.PI; // back to the booth, facing the floor
+          return door;
         }
       }
     }
   }
+  return { x: 2, z: 0 };
 })();
 
 player.onFootstep = (running, speedFrac) => audio.footstep(running, speedFrac);
@@ -145,6 +147,11 @@ function startGame() {
   vhs.resetTape();
   if (touch.active) document.body.classList.add('touch-playing');
   else lockPointer();
+  // the mantrap seals behind you a breath after the tape starts
+  setTimeout(() => {
+    audio.doorSeal(mantrap.x, mantrap.z);
+    vhs.kick(0.45);
+  }, 2300);
 }
 prologue.onFinish = startGame;
 

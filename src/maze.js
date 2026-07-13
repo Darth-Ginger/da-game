@@ -41,7 +41,6 @@ export const ZONES = {
   SERVER: 'server',   // ordinary aisles: racks along walls
   STACKS: 'stacks',   // dense freestanding rack rows, shoulder-width aisles
   OFFICE: 'office',
-  NOC: 'noc',         // network operations: console rows, glowing wall screens
   BATTERY: 'battery', // UPS cabinets, amber LEDs, deep hum, mostly dark
   DARK: 'dark',
   HALL: 'hall'
@@ -104,13 +103,6 @@ export function aisleSignAt(x, y) {
   if (axis === 'x' && (wallE(x, y) || wallW(x, y))) return null;
   const num = axis === 'y' ? mod(x, ZONE_SIZE) + 1 : mod(y, ZONE_SIZE) + 1;
   return { axis, label: `${sectionAt(x, y)} · AISLE ${String(num).padStart(2, '0')}` };
-}
-
-/** Uniform console-row facing for a NOC super-cell. */
-export function nocFacing(x, y) {
-  const zx = Math.floor(x / ZONE_SIZE);
-  const zy = Math.floor(y / ZONE_SIZE);
-  return Math.floor(hash(zx, zy, 16) * 4) * Math.PI / 2;
 }
 
 // Server zones lay their racks in coherent aisles: 'x' aisles run east-west.
@@ -186,8 +178,6 @@ export function fixtureAt(x, y) {
   let state;
   if (zone === ZONES.HALL) {
     state = s < 0.6 ? FIX.ON : s < 0.75 ? FIX.FLICKER : s < 0.82 ? FIX.DYING : FIX.DEAD;
-  } else if (zone === ZONES.NOC) {
-    state = s < 0.5 ? FIX.ON : s < 0.7 ? FIX.FLICKER : s < 0.78 ? FIX.DYING : FIX.DEAD;
   } else if (zone === ZONES.SERVER) {
     state = s < 0.22 ? FIX.ON : s < 0.34 ? FIX.FLICKER : s < 0.42 ? FIX.DYING : FIX.DEAD;
   } else if (zone === ZONES.STACKS) {
@@ -280,21 +270,6 @@ export function batterySides(x, y) {
   return sides.length ? sides : null;
 }
 
-/** Glowing status screen mounted on a NOC wall ('N'|'S'|'E'|'W' or null). */
-export function wallScreenAt(x, y) {
-  if (zoneAt(x, y) !== ZONES.NOC) return null;
-  const r = hash(x, y, 32);
-  if (r > 0.24) return null;
-  const order = ['N', 'E', 'S', 'W'];
-  const start = Math.floor(r * 40) % 4;
-  const has = { N: wallN(x, y), S: wallS(x, y), E: wallE(x, y), W: wallW(x, y) };
-  for (let i = 0; i < 4; i++) {
-    const s = order[(start + i) % 4];
-    if (has[s]) return s;
-  }
-  return null;
-}
-
 /**
  * Disturbed raised floor: a tile lifted out, leaving a dark opening —
  * sometimes with the sub-floor glowing faint red through it.
@@ -327,7 +302,7 @@ export function floorDisturbAt(x, y) {
 export function workstationAt(x, y) {
   const zone = zoneAt(x, y);
   const room = inRoom(x, y);
-  const p = room && zone !== ZONES.NOC
+  const p = room
     ? Math.max(CONFIG.workstations.office, CONFIG.workstations[zone] ?? 0)
     : (CONFIG.workstations[zone] ?? 0.015);
   if (hash(x, y, 23) > p) return null;
@@ -345,10 +320,7 @@ export function propsAt(x, y) {
   const room = inRoom(x, y);
   const r = hash(x, y, S_PROP);
   const out = { desk: false, chair: false, cabinet: false, papers: 0 };
-  if (zone === ZONES.NOC) {
-    if (r < 0.25) out.chair = true; // chairs pushed back from the consoles
-    if (hash(x, y, S_PROP + 2) < 0.3) out.papers = 1 + Math.floor(hash(x, y, S_PROP + 3) * 3);
-  } else if (zone === ZONES.OFFICE || room) {
+  if (zone === ZONES.OFFICE || room) {
     if (r < 0.14) { out.desk = true; out.chair = hash(x, y, S_PROP + 1) < 0.7; }
     else if (r < 0.22) out.cabinet = true;
     else if (r < 0.27) out.chair = true;

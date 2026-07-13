@@ -140,6 +140,10 @@ export function makeMaterials() {
     paper: new THREE.MeshStandardMaterial({ color: 0x8d8c80, roughness: 1.0 }),
     fixtureHousing: new THREE.MeshStandardMaterial({ color: 0x2e3230, roughness: 0.8, metalness: 0.3 }),
     cable: new THREE.MeshStandardMaterial({ color: 0x101014, roughness: 0.85 }),
-    hole: new THREE.MeshBasicMaterial({ color: 0x020503 })
+    hole: new THREE.MeshBasicMaterial({ color: 0x020503 }),
+    glass: new THREE.MeshStandardMaterial({
+      color: 0x9fc4c8, transparent: true, opacity: 0.22,
+      roughness: 0.15, metalness: 0.1, side: THREE.DoubleSide, depthWrite: false
+    })
   };
 }

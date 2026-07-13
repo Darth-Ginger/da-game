@@ -164,9 +164,6 @@ function buildGeometries() {
     boxAt(1.74, 0.1, 0.79, 0, 0.05, 0)
   ]);
 
-  // NOC status wall screen
-  geos.wallScreen = new THREE.PlaneGeometry(1.5, 0.85);
-
   // disturbed raised floor: the dark opening, and the tile set down askew
   geos.hole = new THREE.PlaneGeometry(0.92, 0.92);
   geos.hole.rotateX(-Math.PI / 2);
@@ -222,6 +219,8 @@ export class World {
     this.surge = 0; // LED activity surge, decays on its own
 
     this.signMats = new Map(); // label -> shared backlit-sign material
+    this.spawnCell = null;     // set by main before the first update
+    this.extraColliders = [];  // one-off structures (the spawn mantrap)
     this.lights = [];
     for (let i = 0; i < LIGHT_POOL; i++) {
       const l = new THREE.PointLight(0xd4f0dd, 0, CONFIG.lights.fixtureRange, 1.8);
@@ -458,8 +457,91 @@ export class World {
           }
         }
       }
+      for (const c of this.extraColliders) {
+        if (x + r < c[0] || x - r > c[2] || z + r < c[1] || z - r > c[3]) continue;
+        const p = pushCircle(x, z, r, c[0], c[1], c[2], c[3]);
+        x = p.x; z = p.z;
+      }
     }
     return { x, z };
+  }
+
+  /**
+   * The spawn vestibule: a steel-and-glass mantrap booth against the north
+   * wall of the spawn cell. The player materializes just outside its glass
+   * door — behind it, a sealed steel door with a LOCKED lamp. There is no
+   * way back in. Returns the booth's world position for the seal foley.
+   */
+  buildVestibule(cx, cy) {
+    this.spawnCell = { x: cx, y: cy };
+    const m = this.mats;
+    const group = new THREE.Group();
+    const wallZ = cy * CELL + WALL_T / 2;      // inner face of the north wall
+    const bx = (cx + 0.5) * CELL;              // booth centre x
+    const D = 1.25;                            // booth depth off the wall
+    const W = 1.8;                             // booth width
+    const H = 2.55;
+
+    const box = (mat, w, h, d, x, y, z) => {
+      const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+      mesh.position.set(x, y, z);
+      group.add(mesh);
+      return mesh;
+    };
+
+    // frame: corner posts + header
+    for (const ox of [-W / 2, W / 2]) {
+      box(m.metalDark, 0.12, H, 0.12, bx + ox, H / 2, wallZ + 0.06);
+      box(m.metalDark, 0.12, H, 0.12, bx + ox, H / 2, wallZ + D);
+    }
+    box(m.metalDark, W + 0.12, 0.18, D + 0.12, bx, H - 0.09, wallZ + D / 2);
+    box(m.metalDark, W + 0.12, 0.1, D + 0.12, bx, 0.05, wallZ + D / 2);
+
+    // glass: sides + the front door you just came through (now shut)
+    const glassSide = new THREE.Mesh(new THREE.PlaneGeometry(D - 0.15, H - 0.35), m.glass);
+    glassSide.rotation.y = Math.PI / 2;
+    glassSide.position.set(bx - W / 2, H / 2 - 0.1, wallZ + D / 2);
+    group.add(glassSide);
+    const glassSide2 = glassSide.clone();
+    glassSide2.position.x = bx + W / 2;
+    group.add(glassSide2);
+    const glassDoor = new THREE.Mesh(new THREE.PlaneGeometry(W - 0.2, H - 0.35), m.glass);
+    glassDoor.position.set(bx, H / 2 - 0.1, wallZ + D);
+    group.add(glassDoor);
+    box(m.metalDark, W - 0.16, 0.4, 0.05, bx, 0.3, wallZ + D); // kick plate
+    box(m.metalDark, 0.06, H - 0.3, 0.06, bx, H / 2 - 0.05, wallZ + D); // door stile
+
+    // the sealed steel door at the back, and its LOCKED lamp
+    box(m.plastic, 1.15, 2.25, 0.09, bx, 1.125, wallZ + 0.09);
+    box(m.metalDark, 1.3, 0.12, 0.14, bx, 2.3, wallZ + 0.1);
+    const lamp = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.08, 0.08),
+      new THREE.MeshBasicMaterial({ color: 0xd41f10 })
+    );
+    lamp.position.set(bx + 0.42, 1.95, wallZ + 0.145);
+    group.add(lamp);
+    // badge reader beside the glass door, its own little red eye
+    box(m.plastic, 0.09, 0.14, 0.05, bx + W / 2 + 0.12, 1.15, wallZ + D + 0.02);
+    const eye = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.03, 0.03),
+      new THREE.MeshBasicMaterial({ color: 0xff2a14 })
+    );
+    eye.position.set(bx + W / 2 + 0.12, 1.19, wallZ + D + 0.05);
+    group.add(eye);
+
+    // signage
+    const plate = (label, y, z, w = 0.95, h = 0.34) => {
+      const s = new THREE.Mesh(new THREE.PlaneGeometry(w, h), this.signMaterial(label));
+      s.position.set(bx, y, z);
+      group.add(s);
+    };
+    plate('SUBLEVEL 3 · MAIN FLOOR', 2.75, wallZ + D + 0.02, 1.3, 0.4);
+    plate('MANTRAP · ONE AT A TIME', 2.18, wallZ + D + 0.015, 0.85, 0.28);
+
+    this.scene.add(group);
+    // seal the booth: nobody gets back in
+    this.extraColliders.push([bx - W / 2 - 0.08, wallZ - 0.1, bx + W / 2 + 0.08, wallZ + D + 0.06]);
+    return { x: bx, z: wallZ + D / 2 };
   }
 
   // ------------------------------------------------------------- signage ----
@@ -518,7 +600,6 @@ export class World {
     const leds = { mats: [], colors: [], blinks: [] };
     const screens = { mats: [], colors: [], blinks: [] };
     const glows = { mats: [], colors: [], blinks: [] };     // under-floor red
-    const wallScr = { mats: [], colors: [], blinks: [] };   // NOC status walls
     const tubeGlows = [];
     const fixtures = [];
     const rackPoints = [];
@@ -549,8 +630,8 @@ export class World {
           }
         }
 
-        // spawn cell stays clear of props
-        const isSpawn = x === 0 && y === 0;
+        // spawn cell stays clear of props (the vestibule lives there)
+        const isSpawn = !!this.spawnCell && x === this.spawnCell.x && y === this.spawnCell.y;
 
         // server racks
         const sides = isSpawn ? null : MZ.rackSides(x, y);
@@ -568,22 +649,6 @@ export class World {
             this.placeBatteryRow(x, y, side, batteries, leds, colliders);
           }
           rackPoints.push({ x: wx, y: 0.9, z: wz, seed: MZ.hash(x, y, 35), type: 'battery' });
-        }
-
-        // NOC status screens on walls
-        const wsc = MZ.wallScreenAt(x, y);
-        if (wsc) {
-          const inset = WALL_T / 2 + 0.03;
-          let sx = wx, sz = wz, ry = 0;
-          if (wsc === 'N') { sz = y * CELL + inset; ry = 0; }
-          else if (wsc === 'S') { sz = (y + 1) * CELL - inset; ry = Math.PI; }
-          else if (wsc === 'W') { sx = x * CELL + inset; ry = Math.PI / 2; }
-          else { sx = (x + 1) * CELL - inset; ry = -Math.PI / 2; }
-          wallScr.mats.push(composed(sx, 1.8, sz, ry));
-          const warm = MZ.hash(x, y, 36) < 0.3;
-          wallScr.colors.push(...(warm ? [0.5, 0.28, 0.05] : [0.07, 0.3, 0.38]));
-          const fl = MZ.hash(x, y, 37);
-          wallScr.blinks.push(fl < 0.35 ? 0.4 + fl : 0, fl * 8);
         }
 
         // disturbed raised floor
@@ -765,7 +830,6 @@ export class World {
       addInst(geo, this.ledMat, set.mats, true);
     };
     addEmissive(g.screen, screens);
-    addEmissive(g.wallScreen, wallScr);
     addEmissive(g.holeGlow, glows);
 
     // floor + ceiling slabs
@@ -783,28 +847,21 @@ export class World {
   placeWorkstation(x, y, ws, wsMats, screens, workstations, colliders) {
     const wx = (x + 0.5) * CELL, wz = (y + 0.5) * CELL;
     let px = wx, pz = wz, ry;
-    if (MZ.zoneAt(x, y) === MZ.ZONES.NOC) {
-      // console rows: every desk in the operations room faces the same way
-      ry = MZ.nocFacing(x, y);
-      px += (MZ.hash(x, y, 25) - 0.5) * 0.7;
-      pz += (MZ.hash(x, y, 26) - 0.5) * 0.7;
-    } else {
-      // shove the desk against a wall when there is one; screen faces the room
-      const has = { N: MZ.wallN(x, y), S: MZ.wallS(x, y), E: MZ.wallE(x, y), W: MZ.wallW(x, y) };
-      const order = ['N', 'E', 'S', 'W'];
-      const start = Math.floor(MZ.hash(x, y, 25) * 4);
-      let side = null;
-      for (let i = 0; i < 4; i++) {
-        const s = order[(start + i) % 4];
-        if (has[s]) { side = s; break; }
-      }
-      const BACK = WALL_T / 2 + 0.45;
-      if (side === 'N') { pz = y * CELL + BACK; ry = 0; }              // faces +z
-      else if (side === 'S') { pz = (y + 1) * CELL - BACK; ry = Math.PI; }
-      else if (side === 'W') { px = x * CELL + BACK; ry = Math.PI / 2; } // faces +x
-      else if (side === 'E') { px = (x + 1) * CELL - BACK; ry = -Math.PI / 2; }
-      else { ry = Math.floor(MZ.hash(x, y, 26) * 4) * Math.PI / 2; }     // free-standing
+    // shove the desk against a wall when there is one; screen faces the room
+    const has = { N: MZ.wallN(x, y), S: MZ.wallS(x, y), E: MZ.wallE(x, y), W: MZ.wallW(x, y) };
+    const order = ['N', 'E', 'S', 'W'];
+    const start = Math.floor(MZ.hash(x, y, 25) * 4);
+    let side = null;
+    for (let i = 0; i < 4; i++) {
+      const s = order[(start + i) % 4];
+      if (has[s]) { side = s; break; }
     }
+    const BACK = WALL_T / 2 + 0.45;
+    if (side === 'N') { pz = y * CELL + BACK; ry = 0; }              // faces +z
+    else if (side === 'S') { pz = (y + 1) * CELL - BACK; ry = Math.PI; }
+    else if (side === 'W') { px = x * CELL + BACK; ry = Math.PI / 2; } // faces +x
+    else if (side === 'E') { px = (x + 1) * CELL - BACK; ry = -Math.PI / 2; }
+    else { ry = Math.floor(MZ.hash(x, y, 26) * 4) * Math.PI / 2; }     // free-standing
 
     wsMats.push(composed(px, 0, pz, ry));
 

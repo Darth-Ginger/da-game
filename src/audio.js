@@ -344,6 +344,31 @@ export class AudioScape {
     src.stop(now + 2.5);
   }
 
+  /** Pneumatic hiss + interlock clunk: the mantrap sealing behind you. */
+  doorSeal(x, z) {
+    if (!this.started) return;
+    const ctx = this.ctx;
+    const now = ctx.currentTime;
+    const p = this.posPanner(x, 1.4, z);
+    p.connect(this.reverb);
+    const src = ctx.createBufferSource();
+    src.buffer = this.noiseBuf;
+    const bp = ctx.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.frequency.setValueAtTime(1600, now);
+    bp.frequency.exponentialRampToValueAtTime(420, now + 0.9);
+    bp.Q.value = 2;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, now);
+    g.gain.exponentialRampToValueAtTime(0.14, now + 0.15);
+    g.gain.exponentialRampToValueAtTime(0.0001, now + 1.0);
+    src.connect(bp); bp.connect(g); g.connect(p);
+    src.start(now, Math.random());
+    src.stop(now + 1.1);
+    setTimeout(() => this.metalClank(x, z), 850);
+    setTimeout(() => p.disconnect(), 2000);
+  }
+
   // ------------------------------------------------ presence / haunt fx ----
 
   /** Someone typing at a keyboard a row over. */

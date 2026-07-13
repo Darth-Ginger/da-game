@@ -22,19 +22,17 @@ export const CONFIG = {
 
   // ---- biome distribution (relative weights) ----
   zones: {
-    server: 0.26,
-    stacks: 0.16,
-    office: 0.16,
-    noc: 0.08,
+    server: 0.28,
+    stacks: 0.18,
+    office: 0.18,
     battery: 0.06,
-    dark: 0.16,
-    hall: 0.12
+    dark: 0.17,
+    hall: 0.13
   },
 
   // ---- chance an extra maze wall is removed (loops / openness) ----
   braid: {
     hall: 0.55,
-    noc: 0.6,
     stacks: 0.78, // almost no walls: the racks enclose
     server: 0.26,
     battery: 0.24,
@@ -50,7 +48,7 @@ export const CONFIG = {
     strayOffice: 0.07,
     strayHall: 0.06
   },
-  workstations: { noc: 0.4, office: 0.08, server: 0.025, stacks: 0.05, battery: 0.012, dark: 0.02, hall: 0.015 },
+  workstations: { office: 0.08, server: 0.025, stacks: 0.05, battery: 0.012, dark: 0.02, hall: 0.015 },
 
   // ---- wayfinding signage ----
   signs: {
