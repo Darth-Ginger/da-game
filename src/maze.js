@@ -102,7 +102,7 @@ function braidChance(x, y) {
   const zone = zoneAt(x, y);
   if (zone === ZONES.HALL) return 0.55;   // halls are wide open
   if (zone === ZONES.NOC) return 0.6;     // one big room; the desks divide it
-  if (zone === ZONES.STACKS) return 0.36; // rack rows do the enclosing instead
+  if (zone === ZONES.STACKS) return 0.78; // almost no walls: the racks enclose
   if (zone === ZONES.SERVER) return 0.26; // long aisles need loops
   if (zone === ZONES.BATTERY) return 0.24;
   return 0.16;
@@ -175,14 +175,14 @@ export function rackSides(x, y) {
   if (zone === ZONES.STACKS) {
     // Freestanding rows on cell edges, walls or not — the racks ARE the
     // walls here. Edge-keyed hashes so both neighbouring cells agree, and
-    // ~25% of edges stay clear as cross-cuts so the stacks never seal shut.
+    // ~14% of edges stay clear: the gaps that let you slip between rows.
     const axis = aisleAxis(x, y);
     if (axis === 'y') {
-      if (hash(x, y, 28) < 0.75) sides.push({ side: 'E', count: 2 });
-      if (hash(x - 1, y, 28) < 0.75) sides.push({ side: 'W', count: 2 });
+      if (hash(x, y, 28) < 0.86) sides.push({ side: 'E', count: 2 });
+      if (hash(x - 1, y, 28) < 0.86) sides.push({ side: 'W', count: 2 });
     } else {
-      if (hash(x, y, 29) < 0.75) sides.push({ side: 'S', count: 2 });
-      if (hash(x, y - 1, 29) < 0.75) sides.push({ side: 'N', count: 2 });
+      if (hash(x, y, 29) < 0.86) sides.push({ side: 'S', count: 2 });
+      if (hash(x, y - 1, 29) < 0.86) sides.push({ side: 'N', count: 2 });
     }
     return sides.length ? sides : null;
   }
@@ -286,7 +286,8 @@ export function workstationAt(x, y) {
   else if (zone === ZONES.OFFICE || room) p = 0.08;
   else if (zone === ZONES.SERVER) p = 0.025;
   else if (zone === ZONES.DARK) p = 0.02;
-  else if (zone === ZONES.STACKS || zone === ZONES.BATTERY) p = 0.012;
+  else if (zone === ZONES.STACKS) p = 0.05; // rack-mounted KVM consoles
+  else if (zone === ZONES.BATTERY) p = 0.012;
   else p = 0.015;
   if (hash(x, y, 23) > p) return null;
   return { seed: Math.floor(hash(x, y, 24) * 0xffff) };

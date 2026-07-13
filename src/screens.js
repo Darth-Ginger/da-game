@@ -72,8 +72,9 @@ class ScreenUnit {
     this.lines = [];
     this.input = '';
     this.event = null;
-    // sit 7 mm in front of the baked glow quad
-    this.mesh.position.set(ws.x + ws.fx * 0.152, 0.95, ws.z + ws.fz * 0.152);
+    // sit 7 mm in front of the baked glow quad (desk CRT or rack KVM)
+    const so = (ws.so ?? 0.145) + 0.007;
+    this.mesh.position.set(ws.x + ws.fx * so, ws.sy ?? 0.95, ws.z + ws.fz * so);
     this.mesh.rotation.y = Math.atan2(ws.fx, ws.fz);
     this.mesh.visible = true;
     this.draw();

@@ -105,11 +105,19 @@ function buildGeometries() {
   geos.ceiling = new THREE.PlaneGeometry(CHUNK_M, CHUNK_M);
   geos.ceiling.rotateX(Math.PI / 2);
 
-  // 42U-ish server rack: cabinet + plinth + top cap
+  // full-height server rack: cabinet runs floor to ceiling
   geos.rack = mergeGeometries([
-    boxAt(1.1, 2.1, 0.9, 0, 1.12, 0),
+    boxAt(1.1, 2.86, 0.9, 0, 1.53, 0),
     boxAt(1.14, 0.14, 0.94, 0, 0.07, 0),
-    boxAt(1.14, 0.06, 0.94, 0, 2.2, 0)
+    boxAt(1.14, 0.12, 0.94, 0, 3.02, 0)
+  ]);
+
+  // rack-mounted KVM console: pull-out tray + keyboard + folding screen,
+  // local origin on the rack's front face, +z out into the aisle
+  geos.kvm = mergeGeometries([
+    boxAt(0.5, 0.03, 0.32, 0, 1.1, 0.17),
+    boxAt(0.4, 0.02, 0.13, 0, 1.125, 0.21),
+    boxAt(0.46, 0.34, 0.04, 0, 1.31, 0.05)
   ]);
 
   geos.led = new THREE.PlaneGeometry(0.055, 0.028);
@@ -456,7 +464,7 @@ export class World {
     const group = new THREE.Group();
     const walls = [], racks = [], housings = [], tubes = [], desks = [], chairs = [],
       cabinets = [], papers = [], pillars = [], trays = [], cables = [], wsMats = [],
-      batteries = [], holes = [], tiles = [];
+      batteries = [], holes = [], tiles = [], kvms = [];
     const leds = { mats: [], colors: [], blinks: [] };
     const screens = { mats: [], colors: [], blinks: [] };
     const glows = { mats: [], colors: [], blinks: [] };     // under-floor red
@@ -561,14 +569,25 @@ export class World {
           }
         }
 
-        // computer workstations (interactable terminals)
+        // computer workstations (interactable terminals). In the stacks
+        // they become KVM consoles hung on a rack face; elsewhere a desk,
+        // but never in a cell already occupied by cabinets.
         const ws = isSpawn ? null : MZ.workstationAt(x, y);
+        let wsPlaced = false;
         if (ws) {
-          this.placeWorkstation(x, y, ws, wsMats, screens, workstations, colliders);
+          if (MZ.zoneAt(x, y) === MZ.ZONES.STACKS) {
+            if (sides) {
+              this.placeKvm(x, y, sides[0].side, ws, kvms, screens, workstations);
+              wsPlaced = true;
+            }
+          } else if (!sides && !bsides) {
+            this.placeWorkstation(x, y, ws, wsMats, screens, workstations, colliders);
+            wsPlaced = true;
+          }
         }
 
         // furniture (workstation cells keep their floor clear)
-        const props = (isSpawn || ws) ? null : MZ.propsAt(x, y);
+        const props = (isSpawn || wsPlaced) ? null : MZ.propsAt(x, y);
         if (props) {
           if (props.desk) {
             const ry = Math.floor(MZ.hash(x, y, 41) * 4) * Math.PI / 2;
@@ -650,6 +669,7 @@ export class World {
     addInst(g.wsDesk, m.furniture, wsMats);
     addInst(g.wsHardware, m.plastic, wsMats);
     addInst(g.battery, m.metalDark, batteries);
+    addInst(g.kvm, m.metalDark, kvms);
     addInst(g.hole, m.hole, holes);
     addInst(g.tile, m.ceiling, tiles);
 
@@ -732,8 +752,28 @@ export class World {
     if (flick < 0.2) screens.blinks.push(0.6 + flick * 2, flick * 7);
     else screens.blinks.push(0, 0);
 
-    workstations.push({ x: px, z: pz, fx: sin, fz: cos, seed: ws.seed });
+    workstations.push({ x: px, z: pz, fx: sin, fz: cos, seed: ws.seed, sy: 0.95, so: 0.145 });
     colliders.push([px - 0.72, pz - 0.72, px + 0.72, pz + 0.72]);
+  }
+
+  placeKvm(x, y, side, ws, kvms, screens, workstations) {
+    const D = 0.9, GAP = WALL_T / 2 + D / 2 + 0.03;
+    const wx = (x + 0.5) * CELL, wz = (y + 0.5) * CELL;
+    let px = wx, pz = wz, ry = 0, tx = 0, tz = 0;
+    if (side === 'E') { px = (x + 1) * CELL - GAP; ry = -Math.PI / 2; tz = 1; }
+    if (side === 'W') { px = x * CELL + GAP; ry = Math.PI / 2; tz = 1; }
+    if (side === 'S') { pz = (y + 1) * CELL - GAP; ry = Math.PI; tx = 1; }
+    if (side === 'N') { pz = y * CELL + GAP; ry = 0; tx = 1; }
+    // hang it on one of the row's two cabinets
+    const off = (MZ.hash(x, y, 76) < 0.5 ? -1 : 1) * 0.62;
+    const rx = px + tx * off, rz = pz + tz * off;
+    const fx = Math.sin(ry), fz = Math.cos(ry);
+    const bx = rx + fx * (D / 2), bz = rz + fz * (D / 2);
+    kvms.push(composed(bx, 0, bz, ry));
+    screens.mats.push(composed(bx + fx * 0.078, 1.32, bz + fz * 0.078, ry));
+    screens.colors.push(0.12, 0.5, 0.2);
+    screens.blinks.push(0, 0);
+    workstations.push({ x: bx, z: bz, fx, fz, seed: ws.seed, sy: 1.32, so: 0.078 });
   }
 
   placeBatteryRow(x, y, side, batteries, leds, colliders) {
@@ -786,12 +826,12 @@ export class World {
       const rx = px + tx * off, rz = pz + tz * off;
       racks.push(composed(rx, 0, rz, ry));
 
-      // status LEDs on the front face
-      const n = 5 + Math.floor(MZ.hash(x * 7 + i, y, 70) * 8);
+      // status LEDs over the full height of the front face
+      const n = 6 + Math.floor(MZ.hash(x * 7 + i, y, 70) * 11);
       const sin = Math.sin(ry), cos = Math.cos(ry);
       for (let j = 0; j < n; j++) {
         const lx = (MZ.hash(x, y * 3 + j, 71 + i) - 0.5) * 0.8;
-        const lyy = 0.4 + MZ.hash(x, y * 5 + j, 72 + i) * 1.6;
+        const lyy = 0.35 + MZ.hash(x, y * 5 + j, 72 + i) * 2.35;
         const lz = D / 2 + 0.015;
         // rotate the local offset by ry
         const ox = lx * cos + lz * sin;

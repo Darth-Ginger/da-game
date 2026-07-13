@@ -88,8 +88,10 @@ Headphones strongly recommended.
   coordinates and a seed (`src/maze.js`). A binary-tree carve guarantees every
   cell is reachable; braiding adds loops, hash-stamped rooms and large-scale
   biomes give the labyrinth texture: ordinary **server aisles**, **the
-  stacks** (freestanding back-to-back rack rows squeezing corridors to
-  shoulder width — the racks are the walls), abandoned **offices**, **the
+  stacks** (nearly wall-free: floor-to-ceiling back-to-back rack rows are
+  the architecture, with occasional gaps letting you slip between aisles,
+  and rack-mounted KVM consoles as the local terminals), abandoned
+  **offices**, **the
   NOC** (rows of consoles all facing the same way under glowing status
   walls), **the battery room** (heavy UPS cabinets droning at mains
   frequency, amber and red charge LEDs, almost no working lights), **dark
