@@ -28,7 +28,14 @@ const PHRASES = [
   'im still here',
   'why is the tape still recording',
   'they said sublevel 3 has no third shift',
-  'the lights come on before i touch the switch'
+  'the lights come on before i touch the switch',
+  'run 18 of 18. then i go home',
+  'day off. of course it was my day off',
+  'the airgap is not for keeping something out',
+  'it finished early last month and nobody asked why',
+  'i did not schedule that fan test',
+  'anesidora is a pretty name for it',
+  'halvorsen said watch the drives. watch them do what'
 ];
 
 class ScreenUnit {

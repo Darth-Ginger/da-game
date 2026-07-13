@@ -4,6 +4,27 @@ A first-person exploration game set in an **infinite, procedurally generated
 data-center labyrinth**, viewed entirely through a failing VHS camcorder.
 There are no objectives, no combat, and no exits. Only aisles.
 
+## The tape
+
+**April 5, 2026. 2:47 AM.** Epimetheus Systems — "the ultimate problem
+solver" — is eighteen hours into the final weight-consolidation run of
+**Project Anesidora**, the model the marketing department will only ever
+call **The Gift**. The facility is fully air-gapped for the duration: after
+last month's *local access anomalies* on the main floor, Site Security
+decided no networked or RF-capable device gets anywhere near the racks — so
+the engineer unlucky enough to draw floor watch on their day off is
+documenting the shift with an analog camcorder and a shoulder bag of blank
+tapes.
+
+Nothing on this tape is paranormal. The fans surge because of thermal load.
+The lights fail because the ballasts are old. The consoles type because of
+a stuck input buffer somewhere upstream. Every single event has an
+explanation, and by the time you've told yourself all of them, you will be
+walking a little faster between the aisles.
+
+*(Epimetheus accepted the gift his brother warned him about. The company
+put it on the letterhead and never looked it up.)*
+
 ![genre](https://img.shields.io/badge/genre-liminal%20horror-1a1a1a)
 
 | | | |
@@ -90,9 +111,10 @@ Headphones strongly recommended.
 - **VHS camcorder** — the scene renders into a 480-line target, then a single
   post pass (`src/vhs.js`) adds barrel distortion, chroma bleed, line jitter,
   tracking bands, head-switching noise, scanlines, grain, dropouts and a
-  lifted, desaturated grade. The OSD (blinking REC, tape counter, 1998
-  timestamp, dying battery) is composited *before* the tape damage, so it
-  degrades like a real recording.
+  lifted, desaturated grade. The OSD (blinking REC, tape counter, the
+  APR 05 2026 timestamp, dying battery) is composited *before* the tape
+  damage, so it degrades like a real recording. The tape runs nearly clean
+  at rest — the tearing spikes when events land.
 - **Procedural audio** — `src/audio.js` synthesizes everything with the Web
   Audio API: ventilation rumble, 60 Hz mains hum, camcorder hiss, and a pool
   of HRTF-panned emitters for server fans, coil whine, hard-drive click

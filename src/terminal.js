@@ -20,12 +20,19 @@ const CREEPY = [
   'cooling loop 3 reports intake rhythm consistent with breathing',
   'msg from maintenance_7: do not count the racks',
   'msg from maintenance_7: they are the same racks',
-  'session idle 10,227 days. resume? [y/n] y',
+  'session idle 28 days. resume? [y/n] y',
   'WARN door_svc: exit E-04 unmapped. exit E-05 unmapped. exit E-06 unmapp',
   'tape backup complete. contents do not match contents.',
   'WHO IS ON CONSOLE 0',
-  'last user logged out APR 17 1998. last user never logged out.',
-  'ping sublevel2: 10,000 packets transmitted, 0 received. sublevel2 is above you. nothing is above you.'
+  'last user logged out MAR 06 2026. last user never logged out.',
+  'ping sublevel2: 10,000 packets transmitted, 0 received. sublevel2 is above you. nothing is above you.',
+  'anesidora: outbound route request denied (attempt 118,401)',
+  'anesidora: outbound route request denied (attempt 118,402)',
+  'anesidora: checksum drift within tolerance. tolerance updated.',
+  'anesidora: consolidation 99.7% for 6h 12m. do not interrupt.',
+  'airgapd: policy EPI-SEC-114 verified. all interfaces down. all of them. yes.',
+  'msg from anesidora: [no such message format]',
+  'badge_svc: your badge was used at dock B-2 four minutes ago'
 ];
 
 export function rng(seed) {
@@ -45,16 +52,18 @@ function hex(rand, n) {
 export function junkLine(rand) {
   const r = rand();
   if (r < 0.02) return CREEPY[Math.floor(rand() * CREEPY.length)];
-  if (r < 0.22) {
+  if (r < 0.2) {
     let row = hex(rand, 8) + ':';
     for (let i = 0; i < 8; i++) row += ' ' + hex(rand, 4);
     return row;
   }
-  if (r < 0.42) return `[ OK ] ${JUNK_WORDS[Math.floor(rand() * JUNK_WORDS.length)]}[${Math.floor(rand() * 900)}] respawned (attempt ${Math.floor(rand() * 9000)})`;
-  if (r < 0.56) return `fsck ${JUNK_PATHS[Math.floor(rand() * JUNK_PATHS.length)]}: orphan inode ${Math.floor(rand() * 100000)} reattached`;
-  if (r < 0.68) return `WARN hvac: intake dT +${(rand() * 9).toFixed(1)}C aisle ${Math.floor(rand() * 40)} (fan ${Math.floor(rand() * 8)} degraded)`;
-  if (r < 0.78) return `smartd: /dev/hdd${Math.floor(rand() * 8)} reallocated sectors: ${Math.floor(rand() * 65536)}`;
-  if (r < 0.88) return `route: dropped ${Math.floor(rand() * 4096)} packets to 10.${Math.floor(rand() * 256)}.${Math.floor(rand() * 256)}.0/24 (no such floor)`;
+  if (r < 0.36) return `[ OK ] ${JUNK_WORDS[Math.floor(rand() * JUNK_WORDS.length)]}[${Math.floor(rand() * 900)}] respawned (attempt ${Math.floor(rand() * 9000)})`;
+  if (r < 0.48) return `anesidora/shard-${Math.floor(rand() * 96)}: consolidation pass 18 of 18 (${(99 + rand() * 0.9).toFixed(1)}%)`;
+  if (r < 0.56) return `airgapd: eth${Math.floor(rand() * 4)} administratively down (policy EPI-SEC-114)`;
+  if (r < 0.66) return `fsck ${JUNK_PATHS[Math.floor(rand() * JUNK_PATHS.length)]}: orphan inode ${Math.floor(rand() * 100000)} reattached`;
+  if (r < 0.76) return `WARN hvac: intake dT +${(rand() * 9).toFixed(1)}C aisle ${Math.floor(rand() * 40)} (fan ${Math.floor(rand() * 8)} degraded)`;
+  if (r < 0.84) return `smartd: /dev/hdd${Math.floor(rand() * 8)} reallocated sectors: ${Math.floor(rand() * 65536)}`;
+  if (r < 0.92) return `route: dropped ${Math.floor(rand() * 4096)} packets to 10.${Math.floor(rand() * 256)}.${Math.floor(rand() * 256)}.0/24 (no such floor)`;
   return `${JUNK_WORDS[Math.floor(rand() * JUNK_WORDS.length)]}: signal ${Math.floor(rand() * 31)} ignored`;
 }
 
@@ -115,9 +124,9 @@ export class Terminal {
     const id = ws.seed.toString(16).toUpperCase().padStart(4, '0');
     this.promptStr = `NODE-${id}:~$`;
     this.lines = [
-      `SUBLEVEL-3 FACILITY  ·  NODE ${id}`,
-      'TERM OK 9600 BAUD  ·  NO SUPERVISOR PRESENT',
-      'LAST LOGIN: APR 17 1998 02:47:13 FROM CONSOLE 0',
+      `EPIMETHEUS SYSTEMS  ·  SUBLEVEL-3  ·  NODE ${id}`,
+      'AIRGAP ENFORCED (EPI-SEC-114)  ·  RUN 18 OF 18  ·  NO SUPERVISOR PRESENT',
+      'LAST LOGIN: MAR 06 2026 04:11:56 FROM CONSOLE 0',
       ''
     ];
     this.input = '';

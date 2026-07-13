@@ -147,8 +147,8 @@ export class VHSPass {
     this.osdTex.minFilter = THREE.LinearFilter;
     this.osdTimer = 0;
 
-    // tape starts at a random point on some long-lost night
-    this.tapeEpoch = new Date(1998, 3, 17, 2, 47, 13).getTime();
+    // the night of Anesidora's final consolidation run
+    this.tapeEpoch = new Date(2026, 3, 5, 2, 47, 13).getTime();
     this.startedAt = performance.now();
 
     this.material = new THREE.ShaderMaterial({

@@ -45,7 +45,19 @@
       font-size: clamp(11px, 1.6vw, 16px);
       letter-spacing: 0.25em;
       opacity: 0.7;
-      margin-bottom: 42px;
+      margin-bottom: 28px;
+    }
+    .screen .memo {
+      max-width: min(58ch, 84vw);
+      margin-bottom: 30px;
+      padding: 12px 18px;
+      border: 1px solid rgba(200, 230, 205, 0.3);
+      font-size: clamp(10px, 1.35vw, 13px);
+      letter-spacing: 0.08em;
+      line-height: 1.65;
+      text-align: left;
+      opacity: 0.75;
+      background: rgba(10, 20, 12, 0.35);
     }
     .screen .play {
       font-size: clamp(16px, 2.4vw, 26px);
@@ -68,6 +80,23 @@
       opacity: 0.35;
     }
     @keyframes blink { 50% { opacity: 0; } }
+
+    /* landscape phones: compress the briefing so everything still fits */
+    @media (max-height: 520px) {
+      .screen h1 { margin-bottom: 2px; font-size: 24px; }
+      .screen .sub { margin-bottom: 10px; }
+      .screen .memo {
+        font-size: 9px;
+        line-height: 1.45;
+        margin-bottom: 12px;
+        padding: 8px 12px;
+        max-height: 38vh;
+        overflow-y: auto;
+      }
+      .screen .play { margin-bottom: 12px; font-size: 14px; }
+      .screen .controls { line-height: 1.6; font-size: 9px; }
+      .screen .warn { display: none; }
+    }
 
     /* ---- workstation interaction ---- */
     #interactPrompt {
@@ -229,14 +258,24 @@
 
   <div id="startScreen" class="screen">
     <h1>SUBLEVEL&nbsp;3</h1>
-    <div class="sub">FACILITY CAMERA &mdash; TAPE 07</div>
+    <div class="sub">EPIMETHEUS SYSTEMS &mdash; FACILITY WATCH &mdash; TAPE 07</div>
+    <div class="memo">
+      <b>INTERNAL &mdash; EPI-SYS FACILITIES / SITE SECURITY</b><br />
+      RE: ANESIDORA FINAL CONSOLIDATION RUN (18 OF 18)<br /><br />
+      Full air-gap is in effect for the duration of the run. No networked
+      or RF-capable devices are permitted on the floor. Following last
+      month's local access anomalies, floor watch will document using
+      <b>ANALOG RECORDING EQUIPMENT ONLY</b>. Tapes go to Security on exit.<br /><br />
+      You watch the drives. You do not touch the consoles.<br />
+      &mdash; R. Halvorsen, Site Director
+    </div>
     <div class="play" id="playPrompt">&#9654; CLICK TO INSERT TAPE</div>
     <div class="controls" id="controlsHint">
       W A S D &mdash; MOVE&emsp;&emsp;MOUSE &mdash; LOOK<br />
       SHIFT &mdash; RUN&emsp;&emsp;F &mdash; CAMERA LIGHT&emsp;&emsp;ESC &mdash; PAUSE<br />
       HEADPHONES RECOMMENDED
     </div>
-    <div class="warn">PROPERTY OF FACILITIES MGMT &mdash; DO NOT DISTRIBUTE</div>
+    <div class="warn">PROPERTY OF EPIMETHEUS SYSTEMS &mdash; SUBLEVEL 3 &mdash; IF FOUND RETURN TO SITE SECURITY</div>
   </div>
 
   <div id="pauseScreen" class="screen hidden">
