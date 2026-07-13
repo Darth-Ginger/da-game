@@ -7,12 +7,13 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import * as MZ from './maze.js';
 import { makeMaterials } from './textures.js';
+import { CONFIG } from './config.js';
 
-const CHUNK = 8;                     // cells per chunk side
+const CHUNK = CONFIG.chunk.cells;    // cells per chunk side
 const CHUNK_M = CHUNK * MZ.CELL;     // metres per chunk side
-const LOAD_R = 2;                    // chunk radius kept loaded (5x5)
-const UNLOAD_R = 3;
-const LIGHT_POOL = 6;                // real PointLights, assigned to nearest fixtures
+const LOAD_R = CONFIG.chunk.loadRadius;
+const UNLOAD_R = CONFIG.chunk.unloadRadius;
+const LIGHT_POOL = CONFIG.lights.pool;
 
 const { CELL, WALL_H, WALL_T } = MZ;
 
@@ -175,6 +176,8 @@ function buildGeometries() {
   geos.paper = new THREE.PlaneGeometry(0.21, 0.3);
   geos.paper.rotateX(-Math.PI / 2);
   geos.pillar = new THREE.BoxGeometry(0.5, WALL_H, 0.5);
+  geos.signPlate = new THREE.PlaneGeometry(0.95, 0.34);
+  geos.signRod = new THREE.BoxGeometry(0.025, 0.55, 0.025);
   geos.tray = new THREE.BoxGeometry(0.5, 0.09, CELL + 0.2);
   geos.cable = new THREE.CylinderGeometry(0.02, 0.02, 1, 5);
   return geos;
@@ -218,9 +221,10 @@ export class World {
     this.firstLoad = true;
     this.surge = 0; // LED activity surge, decays on its own
 
+    this.signMats = new Map(); // label -> shared backlit-sign material
     this.lights = [];
     for (let i = 0; i < LIGHT_POOL; i++) {
-      const l = new THREE.PointLight(0xd4f0dd, 0, 16, 1.8);
+      const l = new THREE.PointLight(0xd4f0dd, 0, CONFIG.lights.fixtureRange, 1.8);
       l.position.y = WALL_H - 0.3;
       scene.add(l);
       this.lights.push(l);
@@ -322,7 +326,7 @@ export class World {
       const f = this.litFixturesNear[i];
       if (f) {
         l.position.set(f.x, WALL_H - 0.35, f.z);
-        l.intensity = 55 * f.intensity;
+        l.intensity = CONFIG.lights.fixtureIntensity * f.intensity;
       } else {
         l.intensity = 0;
       }
@@ -456,6 +460,52 @@ export class World {
       }
     }
     return { x, z };
+  }
+
+  // ------------------------------------------------------------- signage ----
+
+  signMaterial(label) {
+    let mat = this.signMats.get(label);
+    if (mat) return mat;
+    const c = document.createElement('canvas');
+    c.width = 256;
+    c.height = 96;
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = '#0e1317';
+    ctx.fillRect(0, 0, 256, 96);
+    ctx.strokeStyle = '#3d4a52';
+    ctx.lineWidth = 4;
+    ctx.strokeRect(4, 4, 248, 88);
+    ctx.fillStyle = '#dcefe2';
+    ctx.shadowColor = 'rgba(180,255,210,0.8)';
+    ctx.shadowBlur = 6;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    // short section ids get the big type; aisle plates the small
+    ctx.font = label.length <= 2 ? 'bold 62px Arial' : 'bold 26px Arial';
+    ctx.fillText(label, 128, 52);
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    mat = new THREE.MeshBasicMaterial({ map: tex });
+    this.signMats.set(label, mat);
+    return mat;
+  }
+
+  /** Two-faced plate hung from the ceiling on rods. */
+  addSign(group, x, z, ry, frontLabel, backLabel) {
+    const g = this.geos;
+    const front = new THREE.Mesh(g.signPlate, this.signMaterial(frontLabel));
+    front.position.set(x, 2.5, z);
+    front.rotation.y = ry;
+    const back = new THREE.Mesh(g.signPlate, this.signMaterial(backLabel));
+    back.position.set(x, 2.5, z);
+    back.rotation.y = ry + Math.PI;
+    group.add(front, back);
+    for (const off of [-0.35, 0.35]) {
+      const rod = new THREE.Mesh(g.signRod, this.mats.metalDark);
+      rod.position.set(x + Math.cos(ry) * off, 2.93, z - Math.sin(ry) * off);
+      group.add(rod);
+    }
   }
 
   // ---------------------------------------------------------- chunk build ----
@@ -625,6 +675,21 @@ export class World {
           const px = x * CELL, pz = y * CELL;
           pillars.push(composed(px, WALL_H / 2, pz));
           colliders.push([px - 0.3, pz - 0.3, px + 0.3, pz + 0.3]);
+        }
+
+        // wayfinding: section-boundary signs + stacks aisle plates
+        const bsign = MZ.sectionSignAt(x, y);
+        if (bsign) {
+          if (bsign.axis === 'x') {
+            // plate hangs on the west edge; each face names where you're headed
+            this.addSign(group, x * CELL, wz, -Math.PI / 2, bsign.here, bsign.there);
+          } else {
+            this.addSign(group, wx, y * CELL, Math.PI, bsign.here, bsign.there);
+          }
+        }
+        const asign = MZ.aisleSignAt(x, y);
+        if (asign) {
+          this.addSign(group, wx, wz, asign.axis === 'y' ? 0 : Math.PI / 2, asign.label, asign.label);
         }
 
         // overhead cable trays + hanging cables

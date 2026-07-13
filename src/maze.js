@@ -7,11 +7,13 @@
 // remove extra walls, creating loops), carve open rooms, and stamp large-scale
 // zones that drive props, lighting and audio.
 
-export const CELL = 4;        // metres per maze cell
-export const WALL_H = 3.1;    // ceiling height
-export const WALL_T = 0.35;   // wall thickness
+import { CONFIG } from './config.js';
 
-const SEED = 19870412;
+export const CELL = CONFIG.cell;
+export const WALL_H = CONFIG.wallHeight;
+export const WALL_T = CONFIG.wallThickness;
+
+const SEED = CONFIG.seed;
 
 // Salts for the various independent random channels
 const S_CARVE = 1;
@@ -33,7 +35,7 @@ export function hash(x, y, salt) {
 
 // ---------------------------------------------------------------- zones ----
 
-const ZONE_SIZE = 14; // cells per zone super-cell
+const ZONE_SIZE = CONFIG.zoneSize; // cells per zone super-cell
 
 export const ZONES = {
   SERVER: 'server',   // ordinary aisles: racks along walls
@@ -45,17 +47,63 @@ export const ZONES = {
   HALL: 'hall'
 };
 
+// biome roulette from CONFIG.zones weights, normalized once
+const ZONE_TABLE = (() => {
+  const entries = Object.entries(CONFIG.zones);
+  const total = entries.reduce((s, [, w]) => s + w, 0);
+  let acc = 0;
+  return entries.map(([name, w]) => {
+    acc += w / total;
+    return [acc, name];
+  });
+})();
+
 export function zoneAt(x, y) {
   const zx = Math.floor(x / ZONE_SIZE);
   const zy = Math.floor(y / ZONE_SIZE);
   const z = hash(zx, zy, S_ZONE);
-  if (z < 0.26) return ZONES.SERVER;
-  if (z < 0.42) return ZONES.STACKS;
-  if (z < 0.58) return ZONES.OFFICE;
-  if (z < 0.66) return ZONES.NOC;
-  if (z < 0.72) return ZONES.BATTERY;
-  if (z < 0.88) return ZONES.DARK;
+  for (const [cutoff, name] of ZONE_TABLE) {
+    if (z < cutoff) return name;
+  }
   return ZONES.HALL;
+}
+
+const mod = (n, k) => ((n % k) + k) % k;
+
+/**
+ * Section identifier for a cell — the facility-map grid (A1..D4), repeating
+ * across the infinite floor. Yes, you have walked through B2 before. It was
+ * a different B2. Probably.
+ */
+export function sectionAt(x, y) {
+  const sx = Math.floor(x / ZONE_SIZE);
+  const sy = Math.floor(y / ZONE_SIZE);
+  return String.fromCharCode(65 + mod(sy, 4)) + (mod(sx, 4) + 1);
+}
+
+/**
+ * A ceiling-hung section sign where an open corridor crosses a section
+ * boundary. Each face names the section you are walking INTO.
+ */
+export function sectionSignAt(x, y) {
+  if (mod(x, ZONE_SIZE) === 0 && !wallW(x, y) && hash(x, y, 80) < CONFIG.signs.boundaryChance) {
+    return { axis: 'x', here: sectionAt(x, y), there: sectionAt(x - 1, y) };
+  }
+  if (mod(y, ZONE_SIZE) === 0 && !wallN(x, y) && hash(x, y, 81) < CONFIG.signs.boundaryChance) {
+    return { axis: 'y', here: sectionAt(x, y), there: sectionAt(x, y - 1) };
+  }
+  return null;
+}
+
+/** Aisle marker plates in the stacks: "B2 · AISLE 07". */
+export function aisleSignAt(x, y) {
+  if (zoneAt(x, y) !== ZONES.STACKS) return null;
+  if (hash(x, y, 82) > CONFIG.signs.aisleChance) return null;
+  const axis = aisleAxis(x, y);
+  if (axis === 'y' && (wallN(x, y) || wallS(x, y))) return null;
+  if (axis === 'x' && (wallE(x, y) || wallW(x, y))) return null;
+  const num = axis === 'y' ? mod(x, ZONE_SIZE) + 1 : mod(y, ZONE_SIZE) + 1;
+  return { axis, label: `${sectionAt(x, y)} · AISLE ${String(num).padStart(2, '0')}` };
 }
 
 /** Uniform console-row facing for a NOC super-cell. */
@@ -100,12 +148,7 @@ function carvesNorth(x, y) {
 
 function braidChance(x, y) {
   const zone = zoneAt(x, y);
-  if (zone === ZONES.HALL) return 0.55;   // halls are wide open
-  if (zone === ZONES.NOC) return 0.6;     // one big room; the desks divide it
-  if (zone === ZONES.STACKS) return 0.78; // almost no walls: the racks enclose
-  if (zone === ZONES.SERVER) return 0.26; // long aisles need loops
-  if (zone === ZONES.BATTERY) return 0.24;
-  return 0.16;
+  return CONFIG.braid[zone] ?? CONFIG.braid.default;
 }
 
 /** Wall on the EAST edge of cell (x, y) — between (x, y) and (x + 1, y). */
@@ -177,17 +220,18 @@ export function rackSides(x, y) {
     // walls here. Edge-keyed hashes so both neighbouring cells agree, and
     // ~14% of edges stay clear: the gaps that let you slip between rows.
     const axis = aisleAxis(x, y);
+    const cov = CONFIG.racks.stacksCoverage;
     if (axis === 'y') {
-      if (hash(x, y, 28) < 0.86) sides.push({ side: 'E', count: 2 });
-      if (hash(x - 1, y, 28) < 0.86) sides.push({ side: 'W', count: 2 });
+      if (hash(x, y, 28) < cov) sides.push({ side: 'E', count: 2 });
+      if (hash(x - 1, y, 28) < cov) sides.push({ side: 'W', count: 2 });
     } else {
-      if (hash(x, y, 29) < 0.86) sides.push({ side: 'S', count: 2 });
-      if (hash(x, y - 1, 29) < 0.86) sides.push({ side: 'N', count: 2 });
+      if (hash(x, y, 29) < cov) sides.push({ side: 'S', count: 2 });
+      if (hash(x, y - 1, 29) < cov) sides.push({ side: 'N', count: 2 });
     }
     return sides.length ? sides : null;
   }
   if (zone === ZONES.SERVER) {
-    const base = 0.78;
+    const base = CONFIG.racks.serverCoverage;
     const axis = aisleAxis(x, y);
     if (axis === 'y') { // aisles run north-south -> racks on east/west walls
       if (wallE(x, y) && hash(x, y, S_RACK) < base) sides.push({ side: 'E', count: 2 });
@@ -197,7 +241,8 @@ export function rackSides(x, y) {
       if (wallN(x, y) && hash(x, y, S_RACK + 1) < base) sides.push({ side: 'N', count: 2 });
     }
   } else {
-    const base = zone === ZONES.DARK ? 0.2 : zone === ZONES.OFFICE ? 0.07 : 0.06;
+    const base = zone === ZONES.DARK ? CONFIG.racks.strayDark
+      : zone === ZONES.OFFICE ? CONFIG.racks.strayOffice : CONFIG.racks.strayHall;
     const r = hash(x, y, S_RACK + 2);
     if (r < base) {
       // pick one walled side for the stray cabinet
@@ -224,12 +269,13 @@ export function batterySides(x, y) {
   if (zoneAt(x, y) !== ZONES.BATTERY || inRoom(x, y)) return null;
   const sides = [];
   const axis = aisleAxis(x, y);
+  const cov = CONFIG.racks.batteryCoverage;
   if (axis === 'y') {
-    if (hash(x, y, 30) < 0.68) sides.push('E');
-    if (hash(x - 1, y, 30) < 0.68) sides.push('W');
+    if (hash(x, y, 30) < cov) sides.push('E');
+    if (hash(x - 1, y, 30) < cov) sides.push('W');
   } else {
-    if (hash(x, y, 31) < 0.68) sides.push('S');
-    if (hash(x, y - 1, 31) < 0.68) sides.push('N');
+    if (hash(x, y, 31) < cov) sides.push('S');
+    if (hash(x, y - 1, 31) < cov) sides.push('N');
   }
   return sides.length ? sides : null;
 }
@@ -281,14 +327,9 @@ export function floorDisturbAt(x, y) {
 export function workstationAt(x, y) {
   const zone = zoneAt(x, y);
   const room = inRoom(x, y);
-  let p;
-  if (zone === ZONES.NOC) p = 0.4; // console rows
-  else if (zone === ZONES.OFFICE || room) p = 0.08;
-  else if (zone === ZONES.SERVER) p = 0.025;
-  else if (zone === ZONES.DARK) p = 0.02;
-  else if (zone === ZONES.STACKS) p = 0.05; // rack-mounted KVM consoles
-  else if (zone === ZONES.BATTERY) p = 0.012;
-  else p = 0.015;
+  const p = room && zone !== ZONES.NOC
+    ? Math.max(CONFIG.workstations.office, CONFIG.workstations[zone] ?? 0)
+    : (CONFIG.workstations[zone] ?? 0.015);
   if (hash(x, y, 23) > p) return null;
   return { seed: Math.floor(hash(x, y, 24) * 0xffff) };
 }

@@ -7,6 +7,7 @@
 // the scanline/grain stage so it degrades with the tape like a real OSD.
 
 import * as THREE from 'three';
+import { CONFIG } from './config.js';
 
 const FRAG = /* glsl */`
 precision highp float;
@@ -43,14 +44,14 @@ void main() {
   // jitter. The tearing lives behind uTrack, which the haunt director kicks
   // when something happens — the damage IS the event.
   float line = floor(uv.y * uRes.y);
-  uv.x += (hash12(vec2(line, floor(t * 61.0))) - 0.5) * (0.0006 + uTrack * 0.005);
+  uv.x += (hash12(vec2(line, floor(t * 61.0))) - 0.5) * (${CONFIG.vhs.baseJitter.toFixed(5)} + uTrack * 0.005);
 
   // slow breathing wobble
   uv.x += sin(t * 0.7 + uv.y * 3.0) * 0.0004;
 
   // tracking band: a horizontal strip that tears sideways, drifting down.
   // Nearly invisible at rest, violent during events.
-  float bandAmt = 0.06 + uTrack * 1.6;
+  float bandAmt = ${CONFIG.vhs.baseBand.toFixed(4)} + uTrack * 1.6;
   float bandPos = fract(t * 0.13);
   float band = smoothstep(0.055, 0.0, abs(uv.y - bandPos)) * bandAmt;
   float bandNoise = hash12(vec2(line, floor(t * 30.0)));
@@ -129,7 +130,7 @@ void main() {
 }
 `;
 
-const TAPE_LINES = 480;
+const TAPE_LINES = CONFIG.render.tapeLines;
 
 export class VHSPass {
   constructor(renderer) {
@@ -172,7 +173,7 @@ export class VHSPass {
     this.quadScene.add(quad);
 
     this.track = 0;
-    this.nextTrackAt = 20 + Math.random() * 25;
+    this.nextTrackAt = CONFIG.vhs.wobbleMin + Math.random() * (CONFIG.vhs.wobbleMax - CONFIG.vhs.wobbleMin);
     this.time = 0;
 
     this.setSize(window.innerWidth, window.innerHeight);
@@ -253,9 +254,9 @@ export class VHSPass {
     // the tape's own rare, mild tracking wobble; real damage comes from kick()
     if (this.time > this.nextTrackAt) {
       this.track = Math.max(this.track, 0.3 + Math.random() * 0.25);
-      this.nextTrackAt = this.time + 25 + Math.random() * 35;
+      this.nextTrackAt = this.time + CONFIG.vhs.wobbleMin + Math.random() * (CONFIG.vhs.wobbleMax - CONFIG.vhs.wobbleMin);
     }
-    this.track *= Math.exp(-dt * 2.4);
+    this.track *= Math.exp(-dt * CONFIG.vhs.kickDecay);
 
     this.osdTimer -= dt;
     if (this.osdTimer <= 0) {

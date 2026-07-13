@@ -6,9 +6,10 @@
 
 import * as THREE from 'three';
 import { junkLine, rng } from './terminal.js';
+import { CONFIG } from './config.js';
 
-const POOL = 3;
-const BIND_RANGE = 13;
+const POOL = CONFIG.screens.pool;
+const BIND_RANGE = CONFIG.screens.bindRange;
 
 const CW = 224, CH = 168;      // canvas pixels
 const COLS = 30, ROWS = 11;    // character grid

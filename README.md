@@ -99,6 +99,14 @@ Headphones strongly recommended.
   raised floor: tiles lifted out and set down askew, dark openings with
   cables snaking up, some glowing faint red from the sub-floor. Nothing is
   stored: any region can be generated locally, forever, in any direction.
+  Ceiling-hung backlit signs mark the territory: section plates (A1–D4,
+  matching the NOC facility map) where corridors cross a section line, and
+  aisle markers (`B2 · AISLE 07`) in the stacks. The sections repeat
+  forever. You have walked through B2 before. It was a different B2.
+- **Central tuning** — every designer-facing knob lives in
+  `src/config.js`: biome weights, wall braiding, rack coverage, fog and
+  exposure, light budgets, player movement, VHS damage envelope, haunt
+  scheduling. Change `seed` for a different facility.
 - **Chunk streaming** — `src/world.js` bakes 8×8-cell chunks into instanced
   meshes (walls, racks, LEDs, fluorescents, furniture, cable trays) and
   streams them around the player. Fog hides the horizon. Server zones lay

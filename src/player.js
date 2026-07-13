@@ -3,11 +3,14 @@
 
 import * as THREE from 'three';
 import { CELL } from './maze.js';
+import { CONFIG } from './config.js';
 
-const EYE = 1.62;
-const RADIUS = 0.34;
-const WALK = 3.1;
-const RUN = 5.3;
+const EYE = CONFIG.player.eye;
+const RADIUS = CONFIG.player.radius;
+const WALK = CONFIG.player.walk;
+const RUN = CONFIG.player.run;
+const SENS = CONFIG.player.mouseSens;
+const TOUCH_SENS = CONFIG.player.touchLookSens;
 
 export class Player {
   constructor(camera, domElement) {
@@ -36,8 +39,8 @@ export class Player {
 
     document.addEventListener('mousemove', e => {
       if (!this.enabled || document.pointerLockElement !== this.dom) return;
-      this.yaw -= e.movementX * 0.0021;
-      this.pitch -= e.movementY * 0.0021;
+      this.yaw -= e.movementX * SENS;
+      this.pitch -= e.movementY * SENS;
       this.pitch = Math.max(-1.45, Math.min(1.45, this.pitch));
     });
   }
@@ -57,8 +60,8 @@ export class Player {
 
       if (this.touch && this.touch.active) {
         const look = this.touch.consumeLook();
-        this.yaw -= look.dx * 0.006;
-        this.pitch -= look.dy * 0.006;
+        this.yaw -= look.dx * TOUCH_SENS;
+        this.pitch -= look.dy * TOUCH_SENS;
         this.pitch = Math.max(-1.45, Math.min(1.45, this.pitch));
         strafe += this.touch.move.x;
         fwd += this.touch.move.y;

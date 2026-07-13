@@ -7,6 +7,8 @@
 // Emitters are a small pool of HRTF panners re-assigned every ~0.7 s to the
 // nearest sources the world reports, so sounds swell as you approach them.
 
+import { CONFIG } from './config.js';
+
 export class AudioScape {
   constructor() {
     this.ctx = null;
@@ -19,7 +21,7 @@ export class AudioScape {
     const ctx = this.ctx = new (window.AudioContext || window.webkitAudioContext)();
 
     this.master = ctx.createGain();
-    this.master.gain.value = 0.9;
+    this.master.gain.value = CONFIG.audio.master;
     const comp = ctx.createDynamicsCompressor();
     comp.threshold.value = -18;
     comp.ratio.value = 4;
@@ -102,10 +104,10 @@ export class AudioScape {
     ventLP.type = 'lowpass';
     ventLP.frequency.value = 170;
     const ventGain = ctx.createGain();
-    ventGain.gain.value = 0.16;
+    ventGain.gain.value = CONFIG.audio.ventBase;
     vent.connect(ventLP); ventLP.connect(ventGain); ventGain.connect(this.master);
     this.ventGain = ventGain;
-    this.ventBase = 0.16;
+    this.ventBase = CONFIG.audio.ventBase;
     this.ventRestoreAt = 0;
     const lfo = ctx.createOscillator();
     lfo.frequency.value = 0.055;

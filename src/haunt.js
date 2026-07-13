@@ -13,6 +13,10 @@
 // Everything is scheduled sparsely so no single walk hits the same trick
 // twice in a row.
 
+import { CONFIG } from './config.js';
+
+const H = CONFIG.haunt;
+
 export class Haunt {
   constructor({ world, audio, screens, player, camera, vhs }) {
     this.world = world;
@@ -23,8 +27,8 @@ export class Haunt {
     this.vhs = vhs;
     this.time = 0;
     // grace period: let the first few minutes feel merely empty
-    this.nextScreen = 20 + Math.random() * 15;
-    this.nextPresence = 55 + Math.random() * 45;
+    this.nextScreen = H.graceScreen + Math.random() * 15;
+    this.nextPresence = H.gracePresence + Math.random() * 45;
     this.pendingEnv = -1;
     this.lastPresence = -1;
   }
@@ -33,7 +37,7 @@ export class Haunt {
     this.time += dt;
 
     if (this.time >= this.nextScreen) {
-      this.nextScreen = this.time + 16 + Math.random() * 28;
+      this.nextScreen = this.time + H.screenMin + Math.random() * (H.screenMax - H.screenMin);
       this.screenEvent();
     }
 
@@ -43,7 +47,7 @@ export class Haunt {
     }
 
     if (this.time >= this.nextPresence) {
-      this.nextPresence = this.time + 40 + Math.random() * 75;
+      this.nextPresence = this.time + H.presenceMin + Math.random() * (H.presenceMax - H.presenceMin);
       this.presenceEvent();
     }
   }
@@ -56,8 +60,8 @@ export class Haunt {
       : unit.startLogs(this.audio);
     if (ok && this.vhs) this.vhs.kick(0.3 + Math.random() * 0.2);
     // sometimes the text reaches into the building shortly after
-    if (ok && Math.random() < 0.45) {
-      this.pendingEnv = this.time + 0.8 + Math.random() * 2.2;
+    if (ok && Math.random() < H.envChance) {
+      this.pendingEnv = this.time + H.envDelayMin + Math.random() * (H.envDelayMax - H.envDelayMin);
     }
   }
 

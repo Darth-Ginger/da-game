@@ -9,6 +9,7 @@ import { LiveScreens } from './screens.js';
 import { Haunt } from './haunt.js';
 import { Prologue } from './prologue.js';
 import * as MZ from './maze.js';
+import { CONFIG } from './config.js';
 
 const app = document.getElementById('app');
 const startScreen = document.getElementById('startScreen');
@@ -17,22 +18,26 @@ const pauseScreen = document.getElementById('pauseScreen');
 const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance' });
 renderer.setPixelRatio(1); // the VHS target defines the real resolution
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.6;
+renderer.toneMappingExposure = CONFIG.render.exposure;
 app.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x010201);
-scene.fog = new THREE.FogExp2(0x010201, 0.055);
+scene.fog = new THREE.FogExp2(0x010201, CONFIG.render.fogDensity);
 
-const camera = new THREE.PerspectiveCamera(72, window.innerWidth / window.innerHeight, 0.08, 120);
+const camera = new THREE.PerspectiveCamera(CONFIG.render.fov, window.innerWidth / window.innerHeight, 0.08, 120);
 
 // barely-there ambient so unlit areas stay readable as shapes
-scene.add(new THREE.HemisphereLight(0x3d4a41, 0x171814, 1.9));
+const hemi = CONFIG.render.hemi;
+scene.add(new THREE.HemisphereLight(hemi.sky, hemi.ground, hemi.intensity));
 
 // camcorder light: a weak cold lamp riding on the camera
 // flat decay: keeps near surfaces from blowing out while still reaching down the aisle
-const CAM_LIGHT = 11;
-const camLight = new THREE.PointLight(0xc8e0d2, CAM_LIGHT, 15, 0.9);
+const CAM_LIGHT = CONFIG.render.camLight.intensity;
+const camLight = new THREE.PointLight(
+  CONFIG.render.camLight.color, CAM_LIGHT,
+  CONFIG.render.camLight.distance, CONFIG.render.camLight.decay
+);
 scene.add(camLight);
 let camLightOn = true;
 
