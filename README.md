@@ -33,7 +33,7 @@ put it on the letterhead and never looked it up.)*
 
 | | |
 | --- | --- |
-| ![the stacks](docs/screenshot-stacks.jpg) | ![the NOC](docs/screenshot-noc.jpg) |
+| ![the stacks](docs/screenshot-stacks.jpg) | ![an office room](docs/screenshot-noc.jpg) |
 
 ![terminal](docs/screenshot-terminal.jpg)
 
@@ -82,7 +82,10 @@ Headphones strongly recommended.
   B2/C1/C4 start pulsing on the map, and a mail from the Site Director
   opens over your game telling you to go walk the floor — analog only.
   Acknowledging it cuts to black, a cassette seats, and everything after
-  is tape. (Tab skips the intro.)
+  is tape: you come to facing the floor, with the security mantrap you
+  just came through sealed at your back — a red LOCKED lamp, a badge
+  reader that no longer cares, and a pneumatic clunk as the interlock
+  seats. Secure area. No way back. (Tab skips the intro.)
 
 - **Infinite maze** — the world is a pure function of integer cell
   coordinates and a seed (`src/maze.js`). A binary-tree carve guarantees every
@@ -91,9 +94,7 @@ Headphones strongly recommended.
   stacks** (nearly wall-free: floor-to-ceiling back-to-back rack rows are
   the architecture, with occasional gaps letting you slip between aisles,
   and rack-mounted KVM consoles as the local terminals), abandoned
-  **offices**, **the
-  NOC** (rows of consoles all facing the same way under glowing status
-  walls), **the battery room** (heavy UPS cabinets droning at mains
+  **offices**, **the battery room** (heavy UPS cabinets droning at mains
   frequency, amber and red charge LEDs, almost no working lights), **dark
   sectors** and open **halls**. Racks-heavy biomes also have disturbed
   raised floor: tiles lifted out and set down askew, dark openings with
